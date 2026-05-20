@@ -177,6 +177,26 @@
       word-break: break-all;
     }
 
+    .qr-preview {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #d9ded7;
+      background: #f4f6f2;
+    }
+
+    .qr-preview[hidden] { display: none; }
+
+    .qr-preview canvas {
+      display: block;
+      width: 180px;
+      max-width: 100%;
+      height: auto;
+      margin-top: 8px;
+      background: #ffffff;
+      border-radius: 8px;
+    }
+
     @media (max-width: 720px) {
       .grid, .quantity-row { grid-template-columns: 1fr; }
       .tabs, .button-row button { width: 100%; }
@@ -283,10 +303,17 @@
           </div>
           <div class="button-row">
             <button type="button" id="scan-product-code" class="secondary">バーコード/QR読取</button>
-            <button type="button" id="make-demo-code" class="secondary">デモQR番号</button>
+            <button type="button" id="make-serial-code" class="secondary">シリアルNO発行</button>
+            <button type="button" id="make-product-qr" class="secondary">QR発行</button>
             <button type="submit">商品を追加</button>
           </div>
         </form>
+
+        <div id="product-qr-preview" class="qr-preview" hidden>
+          <strong>発行QR</strong>
+          <p id="product-qr-text" class="meta"></p>
+          <canvas id="product-qr-canvas" width="180" height="180"></canvas>
+        </div>
 
         <div id="admin-scan-box" class="scan-box" hidden>
           <div id="admin-reader" class="scan-reader"></div>
@@ -305,8 +332,9 @@
   </main>
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script>
-    const APP_VERSION = '2026-05-20 カメラ起動安定版';
+    const APP_VERSION = '2026-05-20 QR発行版';
     const RESIDENTS_KEY = 'diaper-demo-residents-v2';
     const PRODUCTS_KEY = 'diaper-demo-products-v2';
     const USAGES_KEY = 'diaper-demo-usages-v2';
@@ -346,7 +374,11 @@
     const stopWorkScanButton = document.getElementById('stop-work-scan');
     const scanProductCodeButton = document.getElementById('scan-product-code');
     const stopAdminScanButton = document.getElementById('stop-admin-scan');
-    const makeDemoCodeButton = document.getElementById('make-demo-code');
+    const makeSerialCodeButton = document.getElementById('make-serial-code');
+    const makeProductQrButton = document.getElementById('make-product-qr');
+    const productQrPreview = document.getElementById('product-qr-preview');
+    const productQrText = document.getElementById('product-qr-text');
+    const productQrCanvas = document.getElementById('product-qr-canvas');
 
     let residents = [];
     let products = [];
@@ -400,6 +432,12 @@
 
     function yen(value) {
       return `${Number(value || 0).toLocaleString('ja-JP')}円`;
+    }
+
+    function makeSerialCode() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const body = Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+      return `DP-${body}`;
     }
 
     function escapeHtml(value) {
@@ -466,6 +504,27 @@
       `;
     }
 
+    function issueProductQr() {
+      const code = productCodeInput.value.trim();
+      if (!code) {
+        setStatus('先にシリアルNOを発行するか、コードを入力してください。', 'warning');
+        return;
+      }
+      if (!window.QRCode) {
+        setStatus('QR発行機能の読み込みに失敗しました。通信状態を確認してください。', 'error');
+        return;
+      }
+
+      productQrText.textContent = `コード: ${code}`;
+      productQrPreview.hidden = false;
+      QRCode.toCanvas(productQrCanvas, code, {
+        width: 180,
+        margin: 1,
+        color: { dark: '#111111', light: '#ffffff' },
+      });
+      setStatus('QRを発行しました。このQRを商品や棚ラベルに貼って使えます。', 'success');
+    }
+
     function renderUsages() {
       usageList.innerHTML = usages.length
         ? usages.slice(0, 10).map((usage) => `
@@ -524,6 +583,7 @@
 
       productForm.reset();
       productPriceInput.value = 0;
+      productQrPreview.hidden = true;
       saveData();
       renderProducts();
       setStatus(`商品を追加しました: ${name} / ${code}`, 'success');
@@ -709,9 +769,12 @@
       startWorkScanButton.addEventListener('click', () => startScanner('work'));
       stopWorkScanButton.addEventListener('click', stopScanner);
       manualSearchButton.addEventListener('click', () => findProductByCode(manualCodeInput.value.trim()));
-      makeDemoCodeButton.addEventListener('click', () => {
-        productCodeInput.value = `DEMO-${Date.now().toString(36).toUpperCase()}`;
+      makeSerialCodeButton.addEventListener('click', () => {
+        productCodeInput.value = makeSerialCode();
+        productQrPreview.hidden = true;
+        setStatus('シリアルNOを発行しました。必要ならQR発行を押してください。', 'success');
       });
+      makeProductQrButton.addEventListener('click', issueProductQr);
       document.querySelectorAll('[data-quantity]').forEach((button) => {
         button.addEventListener('click', () => registerUsage(Number(button.dataset.quantity)));
       });
