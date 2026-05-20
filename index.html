@@ -197,6 +197,16 @@
       border-radius: 8px;
     }
 
+    .qr-preview img {
+      display: block;
+      width: 180px;
+      max-width: 100%;
+      height: auto;
+      margin-top: 8px;
+      background: #ffffff;
+      border-radius: 8px;
+    }
+
     @media (max-width: 720px) {
       .grid, .quantity-row { grid-template-columns: 1fr; }
       .tabs, .button-row button { width: 100%; }
@@ -313,6 +323,7 @@
           <strong>発行QR</strong>
           <p id="product-qr-text" class="meta"></p>
           <canvas id="product-qr-canvas" width="180" height="180"></canvas>
+          <img id="product-qr-image" alt="発行QR" hidden />
         </div>
 
         <div id="admin-scan-box" class="scan-box" hidden>
@@ -333,7 +344,7 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script>
-    const APP_VERSION = '2026-05-20 QR発行安定版';
+    const APP_VERSION = '2026-05-20 QR画像発行版';
     const RESIDENTS_KEY = 'diaper-demo-residents-v2';
     const PRODUCTS_KEY = 'diaper-demo-products-v2';
     const USAGES_KEY = 'diaper-demo-usages-v2';
@@ -378,6 +389,7 @@
     const productQrPreview = document.getElementById('product-qr-preview');
     const productQrText = document.getElementById('product-qr-text');
     const productQrCanvas = document.getElementById('product-qr-canvas');
+    const productQrImage = document.getElementById('product-qr-image');
 
     let residents = [];
     let products = [];
@@ -535,28 +547,26 @@
       throw lastError || new Error('QRライブラリを読み込めませんでした');
     }
 
-    async function issueProductQr() {
+    function issueProductQr() {
       const code = productCodeInput.value.trim();
       if (!code) {
         setStatus('先にシリアルNOを発行するか、コードを入力してください。', 'warning');
         return;
       }
 
-      try {
-        await ensureQrLibrary();
-        productQrText.textContent = `コード: ${code}`;
-        productQrPreview.hidden = false;
-        await QRCode.toCanvas(productQrCanvas, code, {
-          width: 180,
-          margin: 1,
-          color: { dark: '#111111', light: '#ffffff' },
-        });
-        setStatus('QRを発行しました。このQRを商品や棚ラベルに貼って使えます。', 'success');
-      } catch (error) {
-        const message = error && error.message ? error.message : String(error);
+      productQrText.textContent = `コード: ${code}`;
+      productQrCanvas.hidden = true;
+      productQrImage.hidden = false;
+      productQrImage.onerror = () => {
         productQrPreview.hidden = true;
-        setStatus(`QR発行に失敗しました: ${message}`, 'error');
-      }
+        setStatus('QR画像の読み込みに失敗しました。通信状態を確認してください。', 'error');
+      };
+      productQrImage.onload = () => {
+        setStatus('QR画像を発行しました。表示されたQRを保存・印刷して使えます。', 'success');
+      };
+      productQrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&data=${encodeURIComponent(code)}`;
+      productQrPreview.hidden = false;
+      setStatus('QR画像を発行しています。', 'info');
     }
 
     function renderUsages() {
@@ -618,6 +628,8 @@
       productForm.reset();
       productPriceInput.value = 0;
       productQrPreview.hidden = true;
+      productQrImage.hidden = true;
+      productQrImage.removeAttribute('src');
       saveData();
       renderProducts();
       setStatus(`商品を追加しました: ${name} / ${code}`, 'success');
@@ -806,6 +818,8 @@
       makeSerialCodeButton.addEventListener('click', () => {
         productCodeInput.value = makeSerialCode();
         productQrPreview.hidden = true;
+        productQrImage.hidden = true;
+        productQrImage.removeAttribute('src');
         setStatus('シリアルNOを発行しました。必要ならQR発行を押してください。', 'success');
       });
       makeProductQrButton.addEventListener('click', issueProductQr);
