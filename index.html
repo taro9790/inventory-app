@@ -344,7 +344,7 @@
 
   <script src="jsQR.js"></script>
   <script>
-    const APP_VERSION = '2026-05-20 キャッシュ解除QR版';
+    const APP_VERSION = '2026-05-20 jsQR自動読込版';
     const RESIDENTS_KEY = 'diaper-demo-residents-v2';
     const PRODUCTS_KEY = 'diaper-demo-products-v2';
     const USAGES_KEY = 'diaper-demo-usages-v2';
@@ -431,6 +431,38 @@
     function setStatus(text, type = 'info') {
       statusBox.textContent = text;
       statusBox.className = `status ${type}`;
+    }
+
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = () => reject(new Error(`${src} を読み込めませんでした`));
+        document.head.appendChild(script);
+      });
+    }
+
+    async function ensureQrReader() {
+      if (window.jsQR) return;
+
+      const sources = [
+        'jsQR.js',
+        'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js',
+        'https://unpkg.com/jsqr@1.4.0/dist/jsQR.js',
+      ];
+      let lastError = null;
+
+      for (const src of sources) {
+        try {
+          await loadScript(src);
+          if (window.jsQR) return;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      throw lastError || new Error('QR読み取り部品を読み込めませんでした');
     }
 
     function disableServiceWorkerCache() {
@@ -659,14 +691,8 @@
       getScanFeedback().textContent = 'カメラを起動しています...';
       setScanButtons(mode);
 
-      if (!window.jsQR) {
-        getScanFeedback().textContent = 'QR読み取り部品を読み込めませんでした。';
-        setStatus('QR読み取り部品の読み込みに失敗しました。jsQR.js が同じ場所にあるか確認してください。', 'error');
-        setScanButtons('');
-        return;
-      }
-
       try {
+        await ensureQrReader();
         const reader = mode === 'admin' ? adminReader : workReader;
         reader.innerHTML = '';
         activeVideo = document.createElement('video');
