@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>おむつ在庫・使用枚数管理</title>
-  <meta name="theme-color" content="#111827" />
-  <link rel="manifest" href="manifest.json" />
+  <title>おむつ使用記録デモ</title>
+  <meta name="theme-color" content="#1f6f54" />
   <style>
     :root {
       color-scheme: light;
@@ -15,39 +14,22 @@
     }
 
     * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: #f6f7f3;
-    }
-
-    .app-shell {
-      max-width: 980px;
-      margin: 0 auto;
-      padding: 18px;
-    }
-
-    header {
-      margin-bottom: 18px;
-      padding: 18px 0 4px;
-    }
-
+    body { margin: 0; min-height: 100vh; background: #f6f7f3; }
     h1, h2, h3, p { margin: 0; }
+    h1 { font-size: clamp(1.55rem, 4vw, 2.15rem); line-height: 1.2; }
+    h2 { font-size: 1.14rem; margin-bottom: 12px; }
+    h3 { font-size: 1.05rem; }
+    p { line-height: 1.65; }
 
-    h1 {
-      font-size: clamp(1.55rem, 4vw, 2.25rem);
-      line-height: 1.2;
-    }
+    .app-shell { max-width: 920px; margin: 0 auto; padding: 18px; }
+    header { padding: 18px 0 14px; }
+    .lead { color: #526159; margin-top: 8px; }
 
-    h2 { font-size: 1.15rem; margin-bottom: 12px; }
-    h3 { font-size: 1.08rem; }
-
-    p, li { line-height: 1.65; }
-
-    .lead {
-      color: #4b5b52;
-      margin-top: 8px;
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
     }
 
     .panel {
@@ -59,67 +41,8 @@
       box-shadow: 0 1px 2px rgba(20, 38, 25, 0.06);
     }
 
-    .tab-row {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-
-    .tab-button {
-      background: #ffffff;
-      color: #24352b;
-      border-color: #c8d0c6;
-    }
-
-    .tab-button.active {
-      background: #1f6f54;
-      color: #ffffff;
-      border-color: #1f6f54;
-    }
-
-    .view[hidden] {
-      display: none;
-    }
-
-    .form-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
-    }
-
-    .master-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    .mini-list {
-      margin-top: 10px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .mini-item {
-      display: inline-flex;
-      align-items: center;
-      min-height: 34px;
-      padding: 7px 10px;
-      border-radius: 8px;
-      border: 1px solid #d9ded7;
-      background: #f4f6f2;
-      color: #34433a;
-      font-size: 0.9rem;
-    }
-
-    label {
-      display: block;
-      font-size: 0.93rem;
-      color: #34433a;
-    }
-
-    input, select, textarea {
+    label { display: block; color: #34433a; font-size: 0.94rem; }
+    input, select {
       width: 100%;
       margin-top: 6px;
       padding: 12px;
@@ -129,13 +52,6 @@
       color: #17211a;
       font: inherit;
     }
-
-    textarea {
-      resize: vertical;
-      min-height: 82px;
-    }
-
-    .full-span { grid-column: 1 / -1; }
 
     button {
       appearance: none;
@@ -149,21 +65,16 @@
       color: #ffffff;
     }
 
-    button:disabled {
-      cursor: not-allowed;
-      opacity: 0.55;
-    }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .secondary { background: #ffffff; color: #24352b; border-color: #c8d0c6; }
+    .danger { background: #ffffff; color: #9f1d1d; border-color: #e6b8b8; }
+    .active { background: #1f6f54; color: #ffffff; border-color: #1f6f54; }
+    .view[hidden], .scan-box[hidden] { display: none; }
 
-    .secondary-button {
-      background: #ffffff;
-      color: #24352b;
-      border-color: #c8d0c6;
-    }
-
-    .danger-button {
-      background: #ffffff;
-      color: #9f1d1d;
-      border-color: #e6b8b8;
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
     }
 
     .button-row {
@@ -171,124 +82,42 @@
       flex-wrap: wrap;
       gap: 10px;
       align-items: center;
-      margin-top: 14px;
-    }
-
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
-    }
-
-    .summary-card {
-      background: #eef3ec;
-      border: 1px solid #d5ded2;
-      border-radius: 8px;
-      padding: 14px;
-    }
-
-    .summary-card strong {
-      display: block;
-      font-size: 1.65rem;
-      line-height: 1.2;
-      margin-bottom: 4px;
-    }
-
-    .summary-card span {
-      color: #526159;
-      font-size: 0.9rem;
-    }
-
-    .toolbar {
-      display: grid;
-      grid-template-columns: minmax(0, 1.2fr) minmax(160px, 0.6fr);
-      gap: 10px;
-      margin-bottom: 12px;
-    }
-
-    .record-list {
-      display: grid;
-      gap: 12px;
-    }
-
-    .record-card {
-      border: 1px solid #d9ded7;
-      border-radius: 8px;
-      padding: 14px;
-      background: #ffffff;
-    }
-
-    .record-card.found {
-      border-color: #1f6f54;
-      box-shadow: 0 0 0 3px rgba(31, 111, 84, 0.16);
-    }
-
-    .record-header {
-      display: flex;
-      justify-content: space-between;
-      gap: 14px;
-      flex-wrap: wrap;
-      margin-bottom: 10px;
-    }
-
-    .record-meta {
-      color: #526159;
-      font-size: 0.92rem;
-      margin-top: 4px;
-    }
-
-    .stats-row {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 8px;
-      margin: 12px 0;
-    }
-
-    .stat {
-      background: #f4f6f2;
-      border-radius: 8px;
-      padding: 10px;
-    }
-
-    .stat strong {
-      display: block;
-      font-size: 1.2rem;
-    }
-
-    .stat span {
-      display: block;
-      color: #5c685f;
-      font-size: 0.82rem;
-      margin-top: 2px;
-    }
-
-    .record-actions {
-      display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
-      gap: 8px;
-    }
-
-    .qr-section {
       margin-top: 12px;
-      padding: 12px;
+    }
+
+    .tag-list, .card-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 7px 10px;
       border-radius: 8px;
-      background: #f4f6f2;
       border: 1px solid #d9ded7;
+      background: #f4f6f2;
+      color: #34433a;
+      font-size: 0.92rem;
     }
 
-    .qr-box {
-      max-width: 190px;
-      margin-bottom: 8px;
-    }
-
-    .qr-box canvas {
-      width: 100%;
-      height: auto;
-      background: #ffffff;
+    .card {
+      border: 1px solid #d9ded7;
       border-radius: 8px;
+      padding: 12px;
+      background: #ffffff;
     }
 
-    .scanner-panel video {
+    .meta { color: #526159; font-size: 0.92rem; margin-top: 4px; }
+    .scan-box video {
       width: 100%;
       min-height: 220px;
       margin-top: 12px;
@@ -297,26 +126,12 @@
       object-fit: cover;
     }
 
-    .scan-controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .scan-result, .status {
-      margin-top: 12px;
-      padding: 12px;
-      border-radius: 8px;
-      background: #f4f6f2;
-      border: 1px solid #d9ded7;
-    }
-
-    .work-card {
+    .selected-product {
       margin-top: 12px;
       padding: 14px;
-      border-radius: 8px;
       border: 1px solid #d9ded7;
-      background: #ffffff;
+      border-radius: 8px;
+      background: #f4f6f2;
     }
 
     .quantity-row {
@@ -326,306 +141,199 @@
       margin-top: 12px;
     }
 
-    .status.success { border-color: #77ad88; color: #174c2b; }
-    .status.error { border-color: #de9898; color: #8c1d1d; }
-    .status.warning { border-color: #e2c06c; color: #704c00; }
-
-    .empty {
-      color: #526159;
-      padding: 14px 0;
+    .status {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #f4f6f2;
+      border: 1px solid #d9ded7;
     }
 
-    @media (max-width: 760px) {
-      .form-grid, .master-grid, .summary-grid, .toolbar, .stats-row, .record-actions, .quantity-row {
-        grid-template-columns: 1fr;
-      }
+    .status.success { border-color: #77ad88; color: #174c2b; }
+    .status.warning { border-color: #e2c06c; color: #704c00; }
+    .status.error { border-color: #de9898; color: #8c1d1d; }
 
-      .button-row button, .scan-controls button, .record-actions button, .tab-button {
-        width: 100%;
-      }
+    @media (max-width: 720px) {
+      .grid, .quantity-row { grid-template-columns: 1fr; }
+      .tabs, .button-row button { width: 100%; }
     }
   </style>
 </head>
 <body>
   <main class="app-shell">
     <header>
-      <h1>おむつ在庫・使用枚数管理</h1>
-      <p class="lead">介護施設の利用者さんごとに、おむつ類の現在庫・使用枚数・ご家族への請求予定額を確認できます。</p>
+      <h1>おむつ使用記録デモ</h1>
+      <p class="lead">商品バーコードを読み取り、利用者さんと使用枚数を選んで記録します。</p>
     </header>
 
-    <nav class="tab-row" aria-label="画面切り替え">
+    <nav class="tabs">
       <button type="button" class="tab-button active" data-view="work-view">作業する</button>
-      <button type="button" class="tab-button" data-view="admin-view">登録・管理</button>
+      <button type="button" class="tab-button secondary" data-view="admin-view">登録する</button>
     </nav>
 
-    <div id="work-view" class="view">
-      <section class="panel scanner-panel">
+    <section id="work-view" class="view">
+      <div class="panel">
         <h2>作業する</h2>
-        <p class="lead">QRや管理コードで用品を呼び出して、使用枚数を選びます。</p>
-        <div class="scan-controls">
-          <button id="start-scan">スキャン開始</button>
-          <button id="stop-scan" class="secondary-button" disabled>停止</button>
-        </div>
-        <video id="video" autoplay muted playsinline></video>
-        <div class="scan-result">
-          <strong>読み取り結果:</strong>
-          <span id="scan-output">なし</span>
-        </div>
+        <p class="lead">商品バーコード/QRを読み取ってから、利用者さんと枚数を選びます。</p>
+
         <div class="button-row">
-          <input type="text" id="manual-code" placeholder="管理コードを手入力" />
-          <button id="manual-lookup" class="secondary-button">検索</button>
+          <button type="button" id="start-work-scan">商品コードを読む</button>
+          <button type="button" id="stop-work-scan" class="secondary" disabled>停止</button>
         </div>
-        <div id="work-record-preview" class="work-card">
-          <p class="empty">QRを読み取るか、管理コードを入力してください。</p>
-        </div>
-        <div id="status-message" class="status">準備完了</div>
-      </section>
-    </div>
 
-    <div id="admin-view" class="view" hidden>
-      <section class="panel">
-        <h2>基本登録</h2>
-        <div class="master-grid">
-          <div>
-            <form id="resident-form">
-              <label>利用者名
-                <input type="text" id="master-resident-name" placeholder="例：山田 花子" required />
-              </label>
-              <div class="button-row">
-                <button type="submit">追加</button>
-              </div>
-            </form>
-            <div id="resident-master-list" class="mini-list"></div>
-          </div>
-          <div>
-            <form id="product-form">
-              <label>用品名
-                <input type="text" id="master-product-name" placeholder="例：夜用パッド M" required />
-              </label>
-              <div class="form-grid">
-                <label>種別
-                  <select id="master-product-type">
-                    <option value="尿取りパッド">尿取りパッド</option>
-                    <option value="テープ式おむつ">テープ式おむつ</option>
-                    <option value="パンツ式おむつ">パンツ式おむつ</option>
-                    <option value="フラットタイプ">フラットタイプ</option>
-                    <option value="その他">その他</option>
-                  </select>
-                </label>
-                <label>単価
-                  <input type="number" id="master-product-price" value="0" min="0" step="1" />
-                </label>
-              </div>
-              <div class="button-row">
-                <button type="submit">追加</button>
-              </div>
-            </form>
-            <div id="product-master-list" class="mini-list"></div>
-          </div>
+        <div id="work-scan-box" class="scan-box" hidden>
+          <video id="work-video" autoplay muted playsinline></video>
         </div>
-      </section>
 
-      <section class="panel">
-        <h2>利用者に用品を割り当て</h2>
-        <form id="record-form">
-          <div class="form-grid">
-            <label>利用者名
-              <input type="text" id="resident-name" list="resident-options" placeholder="例：山田 花子" required />
-              <datalist id="resident-options"></datalist>
+        <div class="button-row">
+          <input type="text" id="manual-code" placeholder="バーコード番号を手入力" />
+          <button type="button" id="manual-search" class="secondary">検索</button>
+        </div>
+
+        <div id="selected-product" class="selected-product">
+          <p class="meta">商品コードを読み取ってください。</p>
+        </div>
+
+        <div class="grid">
+          <label>利用者さん
+            <select id="work-resident"></select>
+          </label>
+          <label>職員名
+            <input type="text" id="staff-name" placeholder="任意" />
+          </label>
+        </div>
+
+        <div class="quantity-row">
+          <button type="button" data-quantity="1">1枚</button>
+          <button type="button" data-quantity="2">2枚</button>
+          <button type="button" data-quantity="3">3枚</button>
+          <button type="button" data-quantity="4">4枚</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>使用記録</h2>
+        <div id="usage-list" class="card-list"></div>
+      </div>
+    </section>
+
+    <section id="admin-view" class="view" hidden>
+      <div class="panel">
+        <h2>利用者さん登録</h2>
+        <form id="resident-form">
+          <label>名前
+            <input type="text" id="resident-name" placeholder="例：山田 花子" required />
+          </label>
+          <div class="button-row">
+            <button type="submit">追加</button>
+          </div>
+        </form>
+        <div id="resident-list" class="tag-list"></div>
+      </div>
+
+      <div class="panel">
+        <h2>商品登録</h2>
+        <form id="product-form">
+          <div class="grid">
+            <label>商品名
+              <input type="text" id="product-name" placeholder="例：夜用パッド M" required />
             </label>
-            <label>用品種別
-              <select id="item-type">
+            <label>バーコード / QRコード
+              <input type="text" id="product-code" placeholder="読み取り、または手入力" required />
+            </label>
+            <label>種別
+              <select id="product-type">
+                <option value="尿取りパッド">尿取りパッド</option>
                 <option value="テープ式おむつ">テープ式おむつ</option>
                 <option value="パンツ式おむつ">パンツ式おむつ</option>
-                <option value="尿取りパッド">尿取りパッド</option>
                 <option value="フラットタイプ">フラットタイプ</option>
                 <option value="その他">その他</option>
               </select>
             </label>
-            <label>サイズ・商品名
-              <input type="text" id="item-detail" list="product-options" placeholder="例：Mサイズ / 夜用パッド" />
-              <datalist id="product-options"></datalist>
-            </label>
-            <label>管理コード
-              <input type="text" id="item-code" placeholder="自動生成できます" />
-            </label>
-            <label>現在庫
-              <input type="number" id="stock-count" value="0" min="0" required />
-            </label>
-            <label>今月の使用枚数
-              <input type="number" id="used-count" value="0" min="0" required />
-            </label>
-            <label>1枚あたり単価
-              <input type="number" id="unit-price" value="0" min="0" step="1" />
-            </label>
-            <label class="full-span">メモ
-              <textarea id="memo" placeholder="例：ご家族持ち込み、施設購入、次回補充予定など"></textarea>
+            <label>単価
+              <input type="number" id="product-price" min="0" value="0" />
             </label>
           </div>
           <div class="button-row">
-            <button type="button" id="scan-code-for-form" class="secondary-button">バーコード/QR読取</button>
-            <button type="button" id="generate-code" class="secondary-button">管理コード生成</button>
-            <button type="submit" id="submit-record">登録する</button>
-            <button type="button" id="cancel-edit" class="secondary-button" hidden>編集をやめる</button>
-          </div>
-          <div id="form-scan-panel" class="scanner-panel" hidden>
-            <video id="form-video" autoplay muted playsinline></video>
-            <div class="button-row">
-              <button type="button" id="stop-form-scan" class="secondary-button">読取を停止</button>
-            </div>
+            <button type="button" id="scan-product-code" class="secondary">バーコード/QR読取</button>
+            <button type="button" id="make-demo-code" class="secondary">デモQR番号</button>
+            <button type="submit">商品を追加</button>
           </div>
         </form>
-      </section>
 
-      <section class="panel">
-        <h2>集計</h2>
-        <div class="summary-grid">
-          <div class="summary-card">
-            <strong id="total-residents">0</strong>
-            <span>利用者数</span>
-          </div>
-          <div class="summary-card">
-            <strong id="total-records">0</strong>
-            <span>登録用品</span>
-          </div>
-          <div class="summary-card">
-            <strong id="total-used">0</strong>
-            <span>今月の使用枚数</span>
-          </div>
-          <div class="summary-card">
-            <strong id="total-billing">0円</strong>
-            <span>請求予定額</span>
+        <div id="admin-scan-box" class="scan-box" hidden>
+          <video id="admin-video" autoplay muted playsinline></video>
+          <div class="button-row">
+            <button type="button" id="stop-admin-scan" class="secondary">読取を停止</button>
           </div>
         </div>
-      </section>
 
-      <section class="panel">
-        <h2>利用者別一覧</h2>
-        <div class="toolbar">
-          <input type="text" id="search-input" placeholder="利用者名・用品・管理コードで検索" />
-          <select id="sort-select">
-            <option value="resident">利用者名順</option>
-            <option value="low-stock">在庫が少ない順</option>
-            <option value="billing">請求額が高い順</option>
-            <option value="updated">更新が新しい順</option>
-          </select>
-        </div>
-        <div id="record-list" class="record-list"></div>
-      </section>
-    </div>
+        <div id="product-list" class="card-list"></div>
+      </div>
+    </section>
+
+    <div id="status" class="status">準備完了</div>
   </main>
 
   <script src="jsQR.js"></script>
-  <script src="qrcode.min.js"></script>
   <script>
-    const STORAGE_KEY = 'care-diaper-records-v1';
-    const RESIDENTS_KEY = 'care-diaper-residents-v1';
-    const PRODUCTS_KEY = 'care-diaper-products-v1';
+    const RESIDENTS_KEY = 'diaper-demo-residents-v2';
+    const PRODUCTS_KEY = 'diaper-demo-products-v2';
+    const USAGES_KEY = 'diaper-demo-usages-v2';
 
-    const residentForm = document.getElementById('resident-form');
-    const masterResidentNameInput = document.getElementById('master-resident-name');
-    const residentMasterList = document.getElementById('resident-master-list');
-    const residentOptions = document.getElementById('resident-options');
-    const productForm = document.getElementById('product-form');
-    const masterProductTypeInput = document.getElementById('master-product-type');
-    const masterProductNameInput = document.getElementById('master-product-name');
-    const masterProductPriceInput = document.getElementById('master-product-price');
-    const productMasterList = document.getElementById('product-master-list');
-    const productOptions = document.getElementById('product-options');
-    const recordForm = document.getElementById('record-form');
-    const residentNameInput = document.getElementById('resident-name');
-    const itemTypeInput = document.getElementById('item-type');
-    const itemDetailInput = document.getElementById('item-detail');
-    const itemCodeInput = document.getElementById('item-code');
-    const stockCountInput = document.getElementById('stock-count');
-    const usedCountInput = document.getElementById('used-count');
-    const unitPriceInput = document.getElementById('unit-price');
-    const memoInput = document.getElementById('memo');
-    const scanCodeForFormButton = document.getElementById('scan-code-for-form');
-    const generateCodeButton = document.getElementById('generate-code');
-    const submitRecordButton = document.getElementById('submit-record');
-    const cancelEditButton = document.getElementById('cancel-edit');
-    const totalResidents = document.getElementById('total-residents');
-    const totalRecords = document.getElementById('total-records');
-    const totalUsed = document.getElementById('total-used');
-    const totalBilling = document.getElementById('total-billing');
-    const searchInput = document.getElementById('search-input');
-    const sortSelect = document.getElementById('sort-select');
-    const recordList = document.getElementById('record-list');
-    const startScanButton = document.getElementById('start-scan');
-    const stopScanButton = document.getElementById('stop-scan');
-    const video = document.getElementById('video');
-    const scanOutput = document.getElementById('scan-output');
-    const manualCodeInput = document.getElementById('manual-code');
-    const manualLookupButton = document.getElementById('manual-lookup');
-    const statusMessage = document.getElementById('status-message');
-    const formScanPanel = document.getElementById('form-scan-panel');
-    const formVideo = document.getElementById('form-video');
-    const stopFormScanButton = document.getElementById('stop-form-scan');
-    const workRecordPreview = document.getElementById('work-record-preview');
     const tabButtons = document.querySelectorAll('.tab-button');
     const views = document.querySelectorAll('.view');
+    const statusBox = document.getElementById('status');
 
-    let records = [];
+    const residentForm = document.getElementById('resident-form');
+    const residentNameInput = document.getElementById('resident-name');
+    const residentList = document.getElementById('resident-list');
+    const workResidentSelect = document.getElementById('work-resident');
+
+    const productForm = document.getElementById('product-form');
+    const productNameInput = document.getElementById('product-name');
+    const productCodeInput = document.getElementById('product-code');
+    const productTypeInput = document.getElementById('product-type');
+    const productPriceInput = document.getElementById('product-price');
+    const productList = document.getElementById('product-list');
+
+    const selectedProductBox = document.getElementById('selected-product');
+    const usageList = document.getElementById('usage-list');
+    const manualCodeInput = document.getElementById('manual-code');
+    const manualSearchButton = document.getElementById('manual-search');
+    const staffNameInput = document.getElementById('staff-name');
+
+    const workVideo = document.getElementById('work-video');
+    const adminVideo = document.getElementById('admin-video');
+    const workScanBox = document.getElementById('work-scan-box');
+    const adminScanBox = document.getElementById('admin-scan-box');
+    const startWorkScanButton = document.getElementById('start-work-scan');
+    const stopWorkScanButton = document.getElementById('stop-work-scan');
+    const scanProductCodeButton = document.getElementById('scan-product-code');
+    const stopAdminScanButton = document.getElementById('stop-admin-scan');
+    const makeDemoCodeButton = document.getElementById('make-demo-code');
+
     let residents = [];
     let products = [];
+    let usages = [];
+    let selectedProduct = null;
     let currentStream = null;
     let scanning = false;
+    let scanMode = 'work';
+    let activeVideo = workVideo;
+    let barcodeDetector = null;
     let scanCanvas = null;
     let scanContext = null;
-    let lastScannedCode = '';
-    let lastScannedAt = 0;
-    let activeWorkRecordId = '';
-    let editingRecordId = '';
-    let scannerMode = 'work';
-    let barcodeDetector = null;
-    let activeVideo = video;
+    let lastCode = '';
+    let lastCodeAt = 0;
+
+    function setStatus(text, type = 'info') {
+      statusBox.textContent = text;
+      statusBox.className = `status ${type}`;
+    }
 
     function yen(value) {
       return `${Number(value || 0).toLocaleString('ja-JP')}円`;
-    }
-
-    function setStatus(text, type = 'info') {
-      statusMessage.textContent = text;
-      statusMessage.className = `status ${type}`;
-    }
-
-    function loadRecords() {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (!stored) {
-        records = [];
-      } else {
-        try {
-          records = JSON.parse(stored);
-        } catch (error) {
-          records = [];
-        }
-      }
-
-      const storedResidents = localStorage.getItem(RESIDENTS_KEY);
-      const storedProducts = localStorage.getItem(PRODUCTS_KEY);
-      try {
-        residents = storedResidents ? JSON.parse(storedResidents) : [];
-      } catch (error) {
-        residents = [];
-      }
-      try {
-        products = storedProducts ? JSON.parse(storedProducts) : [];
-      } catch (error) {
-        products = [];
-      }
-    }
-
-    function saveRecords() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-    }
-
-    function saveResidents() {
-      localStorage.setItem(RESIDENTS_KEY, JSON.stringify(residents));
-    }
-
-    function saveProducts() {
-      localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
     }
 
     function escapeHtml(value) {
@@ -637,420 +345,163 @@
         .replace(/'/g, '&#039;');
     }
 
-    function generateCode() {
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      const body = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-      return `OM-${body}`;
+    function loadData() {
+      residents = JSON.parse(localStorage.getItem(RESIDENTS_KEY) || '[]');
+      products = JSON.parse(localStorage.getItem(PRODUCTS_KEY) || '[]');
+      usages = JSON.parse(localStorage.getItem(USAGES_KEY) || '[]');
     }
 
-    function getBilling(record) {
-      return Number(record.usedCount || 0) * Number(record.unitPrice || 0);
+    function saveData() {
+      localStorage.setItem(RESIDENTS_KEY, JSON.stringify(residents));
+      localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
+      localStorage.setItem(USAGES_KEY, JSON.stringify(usages));
     }
 
-    function updateSummary() {
-      const residents = new Set(records.map((record) => record.residentName.trim()).filter(Boolean));
-      const used = records.reduce((sum, record) => sum + Number(record.usedCount || 0), 0);
-      const billing = records.reduce((sum, record) => sum + getBilling(record), 0);
-
-      totalResidents.textContent = residents.size;
-      totalRecords.textContent = records.length;
-      totalUsed.textContent = used;
-      totalBilling.textContent = yen(billing);
-    }
-
-    function getVisibleRecords() {
-      const query = searchInput.value.trim().toLowerCase();
-      const filtered = records.filter((record) => {
-        const text = [
-          record.residentName,
-          record.itemType,
-          record.itemDetail,
-          record.code,
-          record.memo,
-        ].join(' ').toLowerCase();
-        return !query || text.includes(query);
+    function switchView(viewId) {
+      views.forEach((view) => {
+        view.hidden = view.id !== viewId;
       });
-
-      return filtered.sort((a, b) => {
-        if (sortSelect.value === 'low-stock') {
-          return Number(a.stockCount || 0) - Number(b.stockCount || 0);
-        }
-        if (sortSelect.value === 'billing') {
-          return getBilling(b) - getBilling(a);
-        }
-        if (sortSelect.value === 'updated') {
-          return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
-        }
-        return a.residentName.localeCompare(b.residentName, 'ja');
+      tabButtons.forEach((button) => {
+        button.classList.toggle('active', button.dataset.view === viewId);
+        button.classList.toggle('secondary', button.dataset.view !== viewId);
       });
     }
 
     function renderResidents() {
-      residentOptions.innerHTML = residents.map((resident) => `<option value="${escapeHtml(resident.name)}"></option>`).join('');
-      residentMasterList.innerHTML = residents.length
-        ? residents.map((resident) => `<span class="mini-item">${escapeHtml(resident.name)}</span>`).join('')
-        : '<span class="mini-item">未登録</span>';
+      residentList.innerHTML = residents.length
+        ? residents.map((name) => `<span class="tag">${escapeHtml(name)}</span>`).join('')
+        : '<span class="tag">未登録</span>';
+
+      workResidentSelect.innerHTML = residents.length
+        ? residents.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')
+        : '<option value="">利用者さんを登録してください</option>';
     }
 
     function renderProducts() {
-      productOptions.innerHTML = products.map((product) => `<option value="${escapeHtml(product.name)}"></option>`).join('');
-      productMasterList.innerHTML = products.length
-        ? products.map((product) => `<span class="mini-item">${escapeHtml(product.name)} / ${yen(product.price)}</span>`).join('')
-        : '<span class="mini-item">未登録</span>';
+      productList.innerHTML = products.length
+        ? products.map((product) => `
+          <article class="card">
+            <h3>${escapeHtml(product.name)}</h3>
+            <p class="meta">${escapeHtml(product.type)} / ${yen(product.price)}<br>コード: ${escapeHtml(product.code)}</p>
+          </article>
+        `).join('')
+        : '<p class="meta">まだ商品が登録されていません。</p>';
     }
 
-    function renderRecords() {
-      recordList.innerHTML = '';
-      const visibleRecords = getVisibleRecords();
-
-      if (visibleRecords.length === 0) {
-        recordList.innerHTML = '<p class="empty">表示する登録がありません。</p>';
-        updateSummary();
+    function renderSelectedProduct() {
+      if (!selectedProduct) {
+        selectedProductBox.innerHTML = '<p class="meta">商品コードを読み取ってください。</p>';
         return;
       }
 
-      visibleRecords.forEach((record) => {
-        const card = document.createElement('article');
-        card.className = 'record-card';
-        card.dataset.id = record.id;
-        card.innerHTML = `
-          <div class="record-header">
-            <div>
-              <h3>${escapeHtml(record.residentName)}</h3>
-              <p class="record-meta">${escapeHtml(record.itemType)} ${escapeHtml(record.itemDetail)}<br>管理コード: ${escapeHtml(record.code)}</p>
-            </div>
-            <div class="record-meta">更新: ${new Date(record.updatedAt || record.createdAt).toLocaleString('ja-JP')}</div>
-          </div>
-          <div class="stats-row">
-            <div class="stat"><strong>${Number(record.stockCount || 0)}</strong><span>現在庫</span></div>
-            <div class="stat"><strong>${Number(record.usedCount || 0)}</strong><span>今月使用</span></div>
-            <div class="stat"><strong>${yen(record.unitPrice)}</strong><span>1枚単価</span></div>
-            <div class="stat"><strong>${yen(getBilling(record))}</strong><span>請求予定</span></div>
-          </div>
-          ${record.memo ? `<p class="record-meta">メモ: ${escapeHtml(record.memo)}</p>` : ''}
-          <div class="record-actions">
-            <button type="button" data-action="edit" data-id="${record.id}" class="secondary-button">編集</button>
-            <button type="button" data-action="use" data-id="${record.id}">使用 +1</button>
-            <button type="button" data-action="undo-use" data-id="${record.id}" class="secondary-button">使用取消</button>
-            <button type="button" data-action="restock-one" data-id="${record.id}" class="secondary-button">入庫 +1</button>
-            <button type="button" data-action="restock-pack" data-id="${record.id}" class="secondary-button">入庫 +10</button>
-            <button type="button" data-action="toggle-qr" data-id="${record.id}" class="secondary-button">QR表示</button>
-            <button type="button" data-action="delete" data-id="${record.id}" class="danger-button">削除</button>
-          </div>
-          <div class="qr-section" hidden>
-            <div class="qr-box">
-              <canvas class="qr-canvas" width="180" height="180"></canvas>
-            </div>
-            <p class="record-meta">管理コード: ${escapeHtml(record.code)}</p>
-          </div>
-        `;
-        card.querySelector('.record-actions').addEventListener('click', handleRecordAction);
-        recordList.appendChild(card);
-      });
-
-      updateSummary();
-    }
-
-    function renderWorkRecord(record) {
-      if (!record) {
-        workRecordPreview.innerHTML = '<p class="empty">QRを読み取るか、管理コードを入力してください。</p>';
-        activeWorkRecordId = '';
-        return;
-      }
-
-      activeWorkRecordId = record.id;
-      workRecordPreview.innerHTML = `
-        <h3>${escapeHtml(record.residentName)}</h3>
-        <p class="record-meta">${escapeHtml(record.itemType)} ${escapeHtml(record.itemDetail)}<br>管理コード: ${escapeHtml(record.code)}</p>
-        <div class="stats-row">
-          <div class="stat"><strong>${Number(record.stockCount || 0)}</strong><span>現在庫</span></div>
-          <div class="stat"><strong>${Number(record.usedCount || 0)}</strong><span>今月使用</span></div>
-          <div class="stat"><strong>${yen(record.unitPrice)}</strong><span>1枚単価</span></div>
-          <div class="stat"><strong>${yen(getBilling(record))}</strong><span>請求予定</span></div>
-        </div>
-        <div class="quantity-row">
-          <button type="button" data-use-count="1">1枚使用</button>
-          <button type="button" data-use-count="2">2枚使用</button>
-          <button type="button" data-use-count="3">3枚使用</button>
-          <button type="button" data-use-count="4">4枚使用</button>
-        </div>
+      selectedProductBox.innerHTML = `
+        <h3>${escapeHtml(selectedProduct.name)}</h3>
+        <p class="meta">${escapeHtml(selectedProduct.type)} / ${yen(selectedProduct.price)}<br>コード: ${escapeHtml(selectedProduct.code)}</p>
       `;
     }
 
-    function touch(record) {
-      record.updatedAt = new Date().toISOString();
+    function renderUsages() {
+      usageList.innerHTML = usages.length
+        ? usages.slice(0, 10).map((usage) => `
+          <article class="card">
+            <h3>${escapeHtml(usage.resident)} / ${escapeHtml(usage.productName)} ${usage.quantity}枚</h3>
+            <p class="meta">${new Date(usage.createdAt).toLocaleString('ja-JP')} / ${escapeHtml(usage.staff || '職員未入力')} / ${yen(usage.quantity * usage.price)}</p>
+          </article>
+        `).join('')
+        : '<p class="meta">まだ使用記録がありません。</p>';
     }
 
-    function handleRecordAction(event) {
-      const button = event.target.closest('button');
-      if (!button) return;
-
-      const record = records.find((entry) => entry.id === button.dataset.id);
-      if (!record) return;
-
-      if (button.dataset.action === 'edit') {
-        startEditRecord(record);
-        return;
-      }
-
-      if (button.dataset.action === 'use') {
-        if (Number(record.stockCount || 0) <= 0) {
-          setStatus('在庫が0のため、使用登録できません。先に入庫してください。', 'warning');
-          return;
-        }
-        record.stockCount = Number(record.stockCount || 0) - 1;
-        record.usedCount = Number(record.usedCount || 0) + 1;
-        touch(record);
-        setStatus(`${record.residentName}さんの使用を1枚登録しました。`, 'success');
-      }
-
-      if (button.dataset.action === 'undo-use') {
-        if (Number(record.usedCount || 0) <= 0) {
-          setStatus('取り消せる使用枚数がありません。', 'warning');
-          return;
-        }
-        record.usedCount = Number(record.usedCount || 0) - 1;
-        record.stockCount = Number(record.stockCount || 0) + 1;
-        touch(record);
-        setStatus('直近分として1枚戻しました。', 'success');
-      }
-
-      if (button.dataset.action === 'restock-one') {
-        record.stockCount = Number(record.stockCount || 0) + 1;
-        touch(record);
-        setStatus('在庫を1枚追加しました。', 'success');
-      }
-
-      if (button.dataset.action === 'restock-pack') {
-        record.stockCount = Number(record.stockCount || 0) + 10;
-        touch(record);
-        setStatus('在庫を10枚追加しました。', 'success');
-      }
-
-      if (button.dataset.action === 'delete') {
-        if (!confirm(`${record.residentName}さんの「${record.itemType}」を削除しますか？`)) return;
-        records = records.filter((entry) => entry.id !== record.id);
-        setStatus('登録を削除しました。', 'success');
-      }
-
-      if (button.dataset.action === 'toggle-qr') {
-        const card = button.closest('.record-card');
-        toggleQRCode(card, record);
-        return;
-      }
-
-      saveRecords();
-      renderRecords();
-    }
-
-    function startEditRecord(record) {
-      editingRecordId = record.id;
-      residentNameInput.value = record.residentName;
-      itemTypeInput.value = record.itemType;
-      itemDetailInput.value = record.itemDetail || '';
-      itemCodeInput.value = record.code;
-      stockCountInput.value = Number(record.stockCount || 0);
-      usedCountInput.value = Number(record.usedCount || 0);
-      unitPriceInput.value = Number(record.unitPrice || 0);
-      memoInput.value = record.memo || '';
-      submitRecordButton.textContent = '編集を保存';
-      cancelEditButton.hidden = false;
-      switchView('admin-view');
-      recordForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      setStatus('編集内容を入力して保存してください。', 'info');
-    }
-
-    function cancelEdit() {
-      editingRecordId = '';
-      recordForm.reset();
-      stockCountInput.value = 0;
-      usedCountInput.value = 0;
-      unitPriceInput.value = 0;
-      submitRecordButton.textContent = '登録する';
-      cancelEditButton.hidden = true;
-    }
-
-    function registerUseCount(count) {
-      const record = records.find((entry) => entry.id === activeWorkRecordId);
-      if (!record) {
-        setStatus('先にQRか管理コードで用品を選んでください。', 'warning');
-        return;
-      }
-
-      if (Number(record.stockCount || 0) < count) {
-        setStatus('在庫数より多い枚数は登録できません。', 'warning');
-        return;
-      }
-
-      record.stockCount = Number(record.stockCount || 0) - count;
-      record.usedCount = Number(record.usedCount || 0) + count;
-      touch(record);
-      saveRecords();
-      renderRecords();
-      renderWorkRecord(record);
-      setStatus(`${record.residentName}さんの使用を${count}枚登録しました。`, 'success');
+    function renderAll() {
+      renderResidents();
+      renderProducts();
+      renderSelectedProduct();
+      renderUsages();
     }
 
     function handleResidentSubmit(event) {
       event.preventDefault();
-      const name = masterResidentNameInput.value.trim();
+      const name = residentNameInput.value.trim();
       if (!name) return;
-      if (residents.some((resident) => resident.name === name)) {
+      if (residents.includes(name)) {
         setStatus('同じ利用者名がすでに登録されています。', 'warning');
         return;
       }
-      residents.push({ id: `resident-${Date.now()}`, name });
-      saveResidents();
+      residents.push(name);
+      residentNameInput.value = '';
+      saveData();
       renderResidents();
-      masterResidentNameInput.value = '';
-      residentNameInput.value = name;
       setStatus('利用者さんを追加しました。', 'success');
     }
 
     function handleProductSubmit(event) {
       event.preventDefault();
-      const name = masterProductNameInput.value.trim();
-      const price = Number(masterProductPriceInput.value || 0);
-      if (!name || Number.isNaN(price)) {
-        setStatus('用品名と単価を確認してください。', 'warning');
+      const name = productNameInput.value.trim();
+      const code = productCodeInput.value.trim();
+      const price = Number(productPriceInput.value || 0);
+
+      if (!name || !code || Number.isNaN(price)) {
+        setStatus('商品名、コード、単価を確認してください。', 'warning');
         return;
       }
-      if (products.some((product) => product.name === name)) {
-        setStatus('同じ用品名がすでに登録されています。', 'warning');
+      if (products.some((product) => product.code === code)) {
+        setStatus('同じバーコード/QRコードがすでに登録されています。', 'warning');
         return;
       }
-      const product = {
+
+      products.push({
         id: `product-${Date.now()}`,
-        type: masterProductTypeInput.value,
         name,
-        price,
-      };
-      products.push(product);
-      saveProducts();
-      renderProducts();
-      masterProductNameInput.value = '';
-      masterProductPriceInput.value = 0;
-      itemTypeInput.value = product.type;
-      itemDetailInput.value = product.name;
-      unitPriceInput.value = product.price;
-      setStatus('用品を追加しました。', 'success');
-    }
-
-    function applySelectedProduct() {
-      const product = products.find((entry) => entry.name === itemDetailInput.value.trim());
-      if (!product) return;
-      itemTypeInput.value = product.type;
-      unitPriceInput.value = product.price;
-    }
-
-    function handleFormSubmit(event) {
-      event.preventDefault();
-
-      const residentName = residentNameInput.value.trim();
-      const stockCount = Number(stockCountInput.value);
-      const usedCount = Number(usedCountInput.value);
-      const unitPrice = Number(unitPriceInput.value || 0);
-      let code = itemCodeInput.value.trim();
-
-      if (!residentName || Number.isNaN(stockCount) || Number.isNaN(usedCount) || Number.isNaN(unitPrice)) {
-        setStatus('利用者名・枚数・単価を確認してください。', 'warning');
-        return;
-      }
-
-      if (!code) {
-        code = generateCode();
-      }
-
-      if (records.some((record) => record.code === code && record.id !== editingRecordId)) {
-        setStatus('同じ管理コードがすでに登録されています。別のコードにしてください。', 'warning');
-        return;
-      }
-
-      if (editingRecordId) {
-        const target = records.find((record) => record.id === editingRecordId);
-        if (!target) {
-          setStatus('編集対象が見つかりません。', 'warning');
-          return;
-        }
-
-        target.residentName = residentName;
-        target.itemType = itemTypeInput.value;
-        target.itemDetail = itemDetailInput.value.trim();
-        target.code = code;
-        target.stockCount = stockCount;
-        target.usedCount = usedCount;
-        target.unitPrice = unitPrice;
-        target.memo = memoInput.value.trim();
-        touch(target);
-        saveRecords();
-        renderRecords();
-        if (target.id === activeWorkRecordId) {
-          renderWorkRecord(target);
-        }
-        cancelEdit();
-        setStatus('編集を保存しました。', 'success');
-        return;
-      }
-
-      const now = new Date().toISOString();
-      records.unshift({
-        id: `record-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        residentName,
-        itemType: itemTypeInput.value,
-        itemDetail: itemDetailInput.value.trim(),
         code,
-        stockCount,
-        usedCount,
-        unitPrice,
-        memo: memoInput.value.trim(),
-        createdAt: now,
-        updatedAt: now,
+        type: productTypeInput.value,
+        price,
       });
 
-      saveRecords();
-      renderRecords();
-      recordForm.reset();
-      stockCountInput.value = 0;
-      usedCountInput.value = 0;
-      unitPriceInput.value = 0;
-      setStatus('登録しました。', 'success');
+      productForm.reset();
+      productPriceInput.value = 0;
+      saveData();
+      renderProducts();
+      setStatus('商品を追加しました。', 'success');
     }
 
-    function handleScanCodeForForm() {
-      scannerMode = 'assign-code';
-      lastScannedCode = '';
-      lastScannedAt = 0;
-      activeVideo = formVideo;
-      formScanPanel.hidden = false;
-      setStatus('読み取ったバーコード/QRを登録フォームの管理コードに入れます。', 'info');
-      startScanner();
-    }
-
-    function handleGenerateCode() {
-      itemCodeInput.value = generateCode();
-    }
-
-    function generateQRCode(canvas, text) {
-      if (typeof QRCode === 'undefined' || !canvas) return;
-      QRCode.toCanvas(canvas, text, {
-        width: 180,
-        margin: 1,
-        color: { dark: '#111111', light: '#ffffff' },
-      });
-    }
-
-    function toggleQRCode(card, record) {
-      const qrSection = card.querySelector('.qr-section');
-      if (!qrSection) return;
-
-      qrSection.hidden = !qrSection.hidden;
-      if (!qrSection.hidden) {
-        const canvas = qrSection.querySelector('.qr-canvas');
-        if (canvas && canvas.dataset.generated !== 'true') {
-          generateQRCode(canvas, record.code);
-          canvas.dataset.generated = 'true';
-        }
+    function findProductByCode(code) {
+      const product = products.find((item) => item.code === code);
+      if (!product) {
+        selectedProduct = null;
+        renderSelectedProduct();
+        setStatus('登録されていない商品コードです。', 'warning');
+        return;
       }
+      selectedProduct = product;
+      renderSelectedProduct();
+      setStatus('商品を読み取りました。利用者さんと枚数を選んでください。', 'success');
+    }
+
+    function registerUsage(quantity) {
+      if (!selectedProduct) {
+        setStatus('先に商品バーコード/QRを読み取ってください。', 'warning');
+        return;
+      }
+      const resident = workResidentSelect.value;
+      if (!resident) {
+        setStatus('利用者さんを選んでください。', 'warning');
+        return;
+      }
+
+      usages.unshift({
+        id: `usage-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        resident,
+        productId: selectedProduct.id,
+        productName: selectedProduct.name,
+        productCode: selectedProduct.code,
+        quantity,
+        price: Number(selectedProduct.price || 0),
+        staff: staffNameInput.value.trim(),
+      });
+
+      saveData();
+      renderUsages();
+      setStatus(`${resident}さんに ${selectedProduct.name} を${quantity}枚記録しました。`, 'success');
     }
 
     function ensureScanCanvas() {
@@ -1071,9 +522,7 @@
             });
           }
           const barcodes = await barcodeDetector.detect(activeVideo);
-          if (barcodes.length > 0) {
-            return barcodes[0].rawValue;
-          }
+          if (barcodes.length > 0) return barcodes[0].rawValue;
         } catch (error) {
           barcodeDetector = null;
         }
@@ -1093,12 +542,13 @@
       return result ? result.data : null;
     }
 
-    async function startScanner() {
+    async function startScanner(mode) {
       if (scanning) return;
-      lastScannedAt = 0;
-      if (scannerMode !== 'assign-code') {
-        activeVideo = video;
-      }
+      scanMode = mode;
+      activeVideo = mode === 'admin' ? adminVideo : workVideo;
+      lastCode = '';
+      lastCodeAt = 0;
+
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         setStatus('このブラウザはカメラに対応していません。', 'error');
         return;
@@ -1108,12 +558,14 @@
         currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         activeVideo.srcObject = currentStream;
         scanning = true;
-        startScanButton.disabled = true;
-        stopScanButton.disabled = false;
-        setStatus('カメラを起動しました。管理コードを読み取ります。', 'success');
+        workScanBox.hidden = mode !== 'work';
+        adminScanBox.hidden = mode !== 'admin';
+        startWorkScanButton.disabled = mode === 'work';
+        stopWorkScanButton.disabled = mode !== 'work';
+        setStatus('読み取り中です。', 'info');
         requestAnimationFrame(scanLoop);
       } catch (error) {
-        setStatus('カメラの起動に失敗しました。ブラウザのカメラ許可を確認してください。', 'error');
+        setStatus('カメラの起動に失敗しました。', 'error');
       }
     }
 
@@ -1123,114 +575,49 @@
         currentStream.getTracks().forEach((track) => track.stop());
         currentStream = null;
       }
-      if (activeVideo) {
-        activeVideo.srcObject = null;
-      }
-      formScanPanel.hidden = true;
-      activeVideo = video;
-      startScanButton.disabled = false;
-      stopScanButton.disabled = true;
-      setStatus('スキャンを停止しました。', 'info');
+      activeVideo.srcObject = null;
+      workScanBox.hidden = true;
+      adminScanBox.hidden = true;
+      startWorkScanButton.disabled = false;
+      stopWorkScanButton.disabled = true;
+      setStatus('読み取りを停止しました。', 'info');
     }
 
     async function scanLoop() {
       if (!scanning) return;
       const code = await decodeCode();
       const now = Date.now();
-      if (code && (code !== lastScannedCode || now - lastScannedAt > 1200)) {
-        lastScannedCode = code;
-        lastScannedAt = now;
-        scanOutput.textContent = code;
-        handleScannedCode(code);
+      if (code && (code !== lastCode || now - lastCodeAt > 1200)) {
+        lastCode = code;
+        lastCodeAt = now;
+        if (scanMode === 'admin') {
+          productCodeInput.value = code;
+          stopScanner();
+          setStatus('商品コードを入力しました。', 'success');
+        } else {
+          manualCodeInput.value = code;
+          findProductByCode(code);
+        }
       }
       requestAnimationFrame(scanLoop);
     }
 
-    function handleScannedCode(code) {
-      if (scannerMode === 'assign-code') {
-        itemCodeInput.value = code;
-        stopScanner();
-        scannerMode = 'work';
-        setStatus('読み取ったコードを管理コードに入れました。', 'success');
-        return;
-      }
-
-      highlightRecord(code);
-    }
-
-    function highlightRecord(code) {
-      const found = records.find((record) => record.code === code);
-      document.querySelectorAll('.record-card').forEach((card) => card.classList.remove('found'));
-
-      if (!found) {
-        setStatus('該当する登録がありません。', 'warning');
-        return;
-      }
-
-      searchInput.value = '';
-      sortSelect.value = 'resident';
-      renderRecords();
-      renderWorkRecord(found);
-      const card = document.querySelector(`.record-card[data-id='${found.id}']`);
-      if (card) {
-        card.classList.add('found');
-        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-      setStatus(`${found.residentName}さんの${found.itemType}を表示しました。`, 'success');
-    }
-
-    function handleManualLookup() {
-      const code = manualCodeInput.value.trim();
-      if (!code) {
-        setStatus('検索する管理コードを入力してください。', 'warning');
-        return;
-      }
-      scanOutput.textContent = code;
-      highlightRecord(code);
-    }
-
-    function switchView(viewId) {
-      views.forEach((view) => {
-        view.hidden = view.id !== viewId;
-      });
-      tabButtons.forEach((button) => {
-        button.classList.toggle('active', button.dataset.view === viewId);
-      });
-    }
-
-    function registerServiceWorker() {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('service-worker.js').catch(() => {});
-      }
-    }
-
-    function setEventListeners() {
-      residentForm.addEventListener('submit', handleResidentSubmit);
-      productForm.addEventListener('submit', handleProductSubmit);
-      recordForm.addEventListener('submit', handleFormSubmit);
-      generateCodeButton.addEventListener('click', handleGenerateCode);
-      scanCodeForFormButton.addEventListener('click', handleScanCodeForForm);
-      cancelEditButton.addEventListener('click', () => {
-        cancelEdit();
-        setStatus('編集を取り消しました。', 'info');
-      });
-      searchInput.addEventListener('input', renderRecords);
-      itemDetailInput.addEventListener('change', applySelectedProduct);
-      sortSelect.addEventListener('change', renderRecords);
-      startScanButton.addEventListener('click', startScanner);
-      stopScanButton.addEventListener('click', stopScanner);
-      stopFormScanButton.addEventListener('click', () => {
-        scannerMode = 'work';
-        stopScanner();
-      });
-      manualLookupButton.addEventListener('click', handleManualLookup);
-      workRecordPreview.addEventListener('click', (event) => {
-        const button = event.target.closest('[data-use-count]');
-        if (!button) return;
-        registerUseCount(Number(button.dataset.useCount));
-      });
+    function initEvents() {
       tabButtons.forEach((button) => {
         button.addEventListener('click', () => switchView(button.dataset.view));
+      });
+      residentForm.addEventListener('submit', handleResidentSubmit);
+      productForm.addEventListener('submit', handleProductSubmit);
+      scanProductCodeButton.addEventListener('click', () => startScanner('admin'));
+      stopAdminScanButton.addEventListener('click', stopScanner);
+      startWorkScanButton.addEventListener('click', () => startScanner('work'));
+      stopWorkScanButton.addEventListener('click', stopScanner);
+      manualSearchButton.addEventListener('click', () => findProductByCode(manualCodeInput.value.trim()));
+      makeDemoCodeButton.addEventListener('click', () => {
+        productCodeInput.value = `DEMO-${Date.now().toString(36).toUpperCase()}`;
+      });
+      document.querySelectorAll('[data-quantity]').forEach((button) => {
+        button.addEventListener('click', () => registerUsage(Number(button.dataset.quantity)));
       });
       window.addEventListener('beforeunload', () => {
         if (currentStream) currentStream.getTracks().forEach((track) => track.stop());
@@ -1238,12 +625,9 @@
     }
 
     function init() {
-      loadRecords();
-      renderResidents();
-      renderProducts();
-      renderRecords();
-      setEventListeners();
-      registerServiceWorker();
+      loadData();
+      renderAll();
+      initEvents();
       setStatus('準備完了', 'info');
     }
 
