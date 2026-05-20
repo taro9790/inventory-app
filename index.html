@@ -332,9 +332,8 @@
   </main>
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script>
-    const APP_VERSION = '2026-05-20 QR発行版';
+    const APP_VERSION = '2026-05-20 QR発行安定版';
     const RESIDENTS_KEY = 'diaper-demo-residents-v2';
     const PRODUCTS_KEY = 'diaper-demo-products-v2';
     const USAGES_KEY = 'diaper-demo-usages-v2';
@@ -504,25 +503,60 @@
       `;
     }
 
-    function issueProductQr() {
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = () => reject(new Error(`${src} を読み込めませんでした`));
+        document.head.appendChild(script);
+      });
+    }
+
+    async function ensureQrLibrary() {
+      if (window.QRCode && typeof QRCode.toCanvas === 'function') return;
+
+      const sources = [
+        'qrcode.min.js',
+        'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js',
+        'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js',
+      ];
+      let lastError = null;
+
+      for (const src of sources) {
+        try {
+          await loadScript(src);
+          if (window.QRCode && typeof QRCode.toCanvas === 'function') return;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      throw lastError || new Error('QRライブラリを読み込めませんでした');
+    }
+
+    async function issueProductQr() {
       const code = productCodeInput.value.trim();
       if (!code) {
         setStatus('先にシリアルNOを発行するか、コードを入力してください。', 'warning');
         return;
       }
-      if (!window.QRCode) {
-        setStatus('QR発行機能の読み込みに失敗しました。通信状態を確認してください。', 'error');
-        return;
-      }
 
-      productQrText.textContent = `コード: ${code}`;
-      productQrPreview.hidden = false;
-      QRCode.toCanvas(productQrCanvas, code, {
-        width: 180,
-        margin: 1,
-        color: { dark: '#111111', light: '#ffffff' },
-      });
-      setStatus('QRを発行しました。このQRを商品や棚ラベルに貼って使えます。', 'success');
+      try {
+        await ensureQrLibrary();
+        productQrText.textContent = `コード: ${code}`;
+        productQrPreview.hidden = false;
+        await QRCode.toCanvas(productQrCanvas, code, {
+          width: 180,
+          margin: 1,
+          color: { dark: '#111111', light: '#ffffff' },
+        });
+        setStatus('QRを発行しました。このQRを商品や棚ラベルに貼って使えます。', 'success');
+      } catch (error) {
+        const message = error && error.message ? error.message : String(error);
+        productQrPreview.hidden = true;
+        setStatus(`QR発行に失敗しました: ${message}`, 'error');
+      }
     }
 
     function renderUsages() {
