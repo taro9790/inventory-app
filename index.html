@@ -306,7 +306,7 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script>
-    const APP_VERSION = '2026-05-20 バーコード読取改善版';
+    const APP_VERSION = '2026-05-20 カメラ起動安定版';
     const RESIDENTS_KEY = 'diaper-demo-residents-v2';
     const PRODUCTS_KEY = 'diaper-demo-products-v2';
     const USAGES_KEY = 'diaper-demo-usages-v2';
@@ -595,41 +595,63 @@
 
       try {
         const readerId = mode === 'admin' ? 'admin-reader' : 'work-reader';
-        scanner = new Html5Qrcode(readerId, {
-          formatsToSupport: SCAN_FORMATS,
-          verbose: false,
-        });
+        scanner = new Html5Qrcode(
+          readerId,
+          SCAN_FORMATS.length
+            ? { formatsToSupport: SCAN_FORMATS, verbose: false }
+            : { verbose: false }
+        );
         scanning = true;
-        getScanFeedback().textContent = 'カメラ起動OK。バーコード/QRを中央に映してください。';
+        getScanFeedback().textContent = 'カメラを起動しています。許可が出たら許可してください。';
         setStatus('読み取り中です。', 'info');
 
-        await scanner.start(
-          { facingMode: { ideal: 'environment' } },
-          {
-            fps: 12,
-            aspectRatio: 1.777,
-            qrbox: (viewfinderWidth, viewfinderHeight) => ({
-              width: Math.min(320, Math.floor(viewfinderWidth * 0.9)),
-              height: Math.min(160, Math.floor(viewfinderHeight * 0.5)),
-            }),
-          },
-          handleDecodedCode,
-          () => {
-            scanWaitCount += 1;
-            if (scanWaitCount % 12 === 0) {
-              getScanFeedback().textContent = 'カメラは動いています。まだ数字は読めていません。バーコードを明るく、横向きで中央へ。';
-            }
-          }
-        );
+        await startCameraWithFallback();
       } catch (error) {
-        getScanFeedback().textContent = 'カメラを起動できませんでした。';
-        setStatus('カメラの起動に失敗しました。ブラウザのカメラ許可とHTTPSのURLを確認してください。', 'error');
+        const message = error && error.message ? error.message : String(error);
+        getScanFeedback().textContent = `カメラを起動できませんでした: ${message}`;
+        setStatus('カメラの起動に失敗しました。別画面のカメラを停止して、ブラウザのカメラ許可を確認してください。', 'error');
         workScanBox.hidden = true;
         adminScanBox.hidden = true;
         setScanButtons('');
         scanning = false;
         scanner = null;
       }
+    }
+
+    async function startCameraWithFallback() {
+      const onScanFailure = () => {
+        scanWaitCount += 1;
+        if (scanWaitCount % 12 === 0) {
+          getScanFeedback().textContent = 'カメラは動いています。まだ数字は読めていません。バーコードを明るく、横向きで中央へ。';
+        }
+      };
+      const cameraConfigs = [
+        { facingMode: 'environment' },
+        { facingMode: { ideal: 'environment' } },
+        { facingMode: 'user' },
+        {},
+      ];
+      const scannerConfig = {
+        fps: 10,
+        qrbox: { width: 260, height: 140 },
+      };
+      let lastError = null;
+
+      for (const cameraConfig of cameraConfigs) {
+        try {
+          await scanner.start(cameraConfig, scannerConfig, handleDecodedCode, onScanFailure);
+          return;
+        } catch (error) {
+          lastError = error;
+          try {
+            await scanner.clear();
+          } catch (clearError) {
+            // Some browsers leave nothing to clear after a failed start.
+          }
+        }
+      }
+
+      throw lastError || new Error('camera start failed');
     }
 
     async function stopScanner(options = {}) {
