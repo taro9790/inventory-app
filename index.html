@@ -359,11 +359,54 @@
 
     <div id="admin-view" class="view" hidden>
       <section class="panel">
-        <h2>利用者さんの用品を登録</h2>
+        <h2>利用者登録</h2>
+        <form id="resident-form">
+          <div class="form-grid">
+            <label>利用者名
+              <input type="text" id="master-resident-name" placeholder="例：山田 花子" required />
+            </label>
+          </div>
+          <div class="button-row">
+            <button type="submit">利用者を追加</button>
+          </div>
+        </form>
+        <div id="resident-master-list" class="record-list"></div>
+      </section>
+
+      <section class="panel">
+        <h2>用品登録</h2>
+        <form id="product-form">
+          <div class="form-grid">
+            <label>用品種別
+              <select id="master-product-type">
+                <option value="テープ式おむつ">テープ式おむつ</option>
+                <option value="パンツ式おむつ">パンツ式おむつ</option>
+                <option value="尿取りパッド">尿取りパッド</option>
+                <option value="フラットタイプ">フラットタイプ</option>
+                <option value="その他">その他</option>
+              </select>
+            </label>
+            <label>サイズ・商品名
+              <input type="text" id="master-product-name" placeholder="例：Mサイズ / 夜用パッド" required />
+            </label>
+            <label>1枚あたり単価
+              <input type="number" id="master-product-price" value="0" min="0" step="1" />
+            </label>
+          </div>
+          <div class="button-row">
+            <button type="submit">用品を追加</button>
+          </div>
+        </form>
+        <div id="product-master-list" class="record-list"></div>
+      </section>
+
+      <section class="panel">
+        <h2>利用者に用品を割り当て</h2>
         <form id="record-form">
           <div class="form-grid">
             <label>利用者名
-              <input type="text" id="resident-name" placeholder="例：山田 花子" required />
+              <input type="text" id="resident-name" list="resident-options" placeholder="例：山田 花子" required />
+              <datalist id="resident-options"></datalist>
             </label>
             <label>用品種別
               <select id="item-type">
@@ -375,7 +418,8 @@
               </select>
             </label>
             <label>サイズ・商品名
-              <input type="text" id="item-detail" placeholder="例：Mサイズ / 夜用パッド" />
+              <input type="text" id="item-detail" list="product-options" placeholder="例：Mサイズ / 夜用パッド" />
+              <datalist id="product-options"></datalist>
             </label>
             <label>管理コード
               <input type="text" id="item-code" placeholder="自動生成できます" />
@@ -398,6 +442,12 @@
             <button type="button" id="generate-code" class="secondary-button">管理コード生成</button>
             <button type="submit" id="submit-record">登録する</button>
             <button type="button" id="cancel-edit" class="secondary-button" hidden>編集をやめる</button>
+          </div>
+          <div id="form-scan-panel" class="scanner-panel" hidden>
+            <video id="form-video" autoplay muted playsinline></video>
+            <div class="button-row">
+              <button type="button" id="stop-form-scan" class="secondary-button">読取を停止</button>
+            </div>
           </div>
         </form>
       </section>
@@ -444,7 +494,19 @@
   <script src="qrcode.min.js"></script>
   <script>
     const STORAGE_KEY = 'care-diaper-records-v1';
+    const RESIDENTS_KEY = 'care-diaper-residents-v1';
+    const PRODUCTS_KEY = 'care-diaper-products-v1';
 
+    const residentForm = document.getElementById('resident-form');
+    const masterResidentNameInput = document.getElementById('master-resident-name');
+    const residentMasterList = document.getElementById('resident-master-list');
+    const residentOptions = document.getElementById('resident-options');
+    const productForm = document.getElementById('product-form');
+    const masterProductTypeInput = document.getElementById('master-product-type');
+    const masterProductNameInput = document.getElementById('master-product-name');
+    const masterProductPriceInput = document.getElementById('master-product-price');
+    const productMasterList = document.getElementById('product-master-list');
+    const productOptions = document.getElementById('product-options');
     const recordForm = document.getElementById('record-form');
     const residentNameInput = document.getElementById('resident-name');
     const itemTypeInput = document.getElementById('item-type');
@@ -472,11 +534,16 @@
     const manualCodeInput = document.getElementById('manual-code');
     const manualLookupButton = document.getElementById('manual-lookup');
     const statusMessage = document.getElementById('status-message');
+    const formScanPanel = document.getElementById('form-scan-panel');
+    const formVideo = document.getElementById('form-video');
+    const stopFormScanButton = document.getElementById('stop-form-scan');
     const workRecordPreview = document.getElementById('work-record-preview');
     const tabButtons = document.querySelectorAll('.tab-button');
     const views = document.querySelectorAll('.view');
 
     let records = [];
+    let residents = [];
+    let products = [];
     let currentStream = null;
     let scanning = false;
     let scanCanvas = null;
@@ -486,6 +553,7 @@
     let editingRecordId = '';
     let scannerMode = 'work';
     let barcodeDetector = null;
+    let activeVideo = video;
 
     function yen(value) {
       return `${Number(value || 0).toLocaleString('ja-JP')}円`;
@@ -500,17 +568,38 @@
       const stored = localStorage.getItem(STORAGE_KEY);
       if (!stored) {
         records = [];
-        return;
+      } else {
+        try {
+          records = JSON.parse(stored);
+        } catch (error) {
+          records = [];
+        }
+      }
+
+      const storedResidents = localStorage.getItem(RESIDENTS_KEY);
+      const storedProducts = localStorage.getItem(PRODUCTS_KEY);
+      try {
+        residents = storedResidents ? JSON.parse(storedResidents) : [];
+      } catch (error) {
+        residents = [];
       }
       try {
-        records = JSON.parse(stored);
+        products = storedProducts ? JSON.parse(storedProducts) : [];
       } catch (error) {
-        records = [];
+        products = [];
       }
     }
 
     function saveRecords() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    }
+
+    function saveResidents() {
+      localStorage.setItem(RESIDENTS_KEY, JSON.stringify(residents));
+    }
+
+    function saveProducts() {
+      localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
     }
 
     function escapeHtml(value) {
@@ -568,6 +657,25 @@
         }
         return a.residentName.localeCompare(b.residentName, 'ja');
       });
+    }
+
+    function renderResidents() {
+      residentOptions.innerHTML = residents.map((resident) => `<option value="${escapeHtml(resident.name)}"></option>`).join('');
+      residentMasterList.innerHTML = residents.length
+        ? residents.map((resident) => `<article class="record-card"><h3>${escapeHtml(resident.name)}</h3></article>`).join('')
+        : '<p class="empty">まだ利用者さんが登録されていません。</p>';
+    }
+
+    function renderProducts() {
+      productOptions.innerHTML = products.map((product) => `<option value="${escapeHtml(product.name)}"></option>`).join('');
+      productMasterList.innerHTML = products.length
+        ? products.map((product) => `
+          <article class="record-card">
+            <h3>${escapeHtml(product.name)}</h3>
+            <p class="record-meta">${escapeHtml(product.type)} / ${yen(product.price)}</p>
+          </article>
+        `).join('')
+        : '<p class="empty">まだ用品が登録されていません。</p>';
     }
 
     function renderRecords() {
@@ -762,6 +870,58 @@
       setStatus(`${record.residentName}さんの使用を${count}枚登録しました。`, 'success');
     }
 
+    function handleResidentSubmit(event) {
+      event.preventDefault();
+      const name = masterResidentNameInput.value.trim();
+      if (!name) return;
+      if (residents.some((resident) => resident.name === name)) {
+        setStatus('同じ利用者名がすでに登録されています。', 'warning');
+        return;
+      }
+      residents.push({ id: `resident-${Date.now()}`, name });
+      saveResidents();
+      renderResidents();
+      masterResidentNameInput.value = '';
+      residentNameInput.value = name;
+      setStatus('利用者さんを追加しました。', 'success');
+    }
+
+    function handleProductSubmit(event) {
+      event.preventDefault();
+      const name = masterProductNameInput.value.trim();
+      const price = Number(masterProductPriceInput.value || 0);
+      if (!name || Number.isNaN(price)) {
+        setStatus('用品名と単価を確認してください。', 'warning');
+        return;
+      }
+      if (products.some((product) => product.name === name)) {
+        setStatus('同じ用品名がすでに登録されています。', 'warning');
+        return;
+      }
+      const product = {
+        id: `product-${Date.now()}`,
+        type: masterProductTypeInput.value,
+        name,
+        price,
+      };
+      products.push(product);
+      saveProducts();
+      renderProducts();
+      masterProductNameInput.value = '';
+      masterProductPriceInput.value = 0;
+      itemTypeInput.value = product.type;
+      itemDetailInput.value = product.name;
+      unitPriceInput.value = product.price;
+      setStatus('用品を追加しました。', 'success');
+    }
+
+    function applySelectedProduct() {
+      const product = products.find((entry) => entry.name === itemDetailInput.value.trim());
+      if (!product) return;
+      itemTypeInput.value = product.type;
+      unitPriceInput.value = product.price;
+    }
+
     function handleFormSubmit(event) {
       event.preventDefault();
 
@@ -838,7 +998,8 @@
     function handleScanCodeForForm() {
       scannerMode = 'assign-code';
       lastScannedCode = '';
-      switchView('work-view');
+      activeVideo = formVideo;
+      formScanPanel.hidden = false;
       setStatus('読み取ったバーコード/QRを登録フォームの管理コードに入れます。', 'info');
       startScanner();
     }
@@ -878,7 +1039,7 @@
     }
 
     async function decodeCode() {
-      if (video.readyState !== HTMLMediaElement.HAVE_ENOUGH_DATA) return null;
+      if (activeVideo.readyState !== HTMLMediaElement.HAVE_ENOUGH_DATA) return null;
 
       if ('BarcodeDetector' in window) {
         try {
@@ -887,7 +1048,7 @@
               formats: ['qr_code', 'code_128', 'code_39', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'itf'],
             });
           }
-          const barcodes = await barcodeDetector.detect(video);
+          const barcodes = await barcodeDetector.detect(activeVideo);
           if (barcodes.length > 0) {
             return barcodes[0].rawValue;
           }
@@ -898,13 +1059,13 @@
 
       if (!window.jsQR) return null;
       ensureScanCanvas();
-      const width = video.videoWidth;
-      const height = video.videoHeight;
+      const width = activeVideo.videoWidth;
+      const height = activeVideo.videoHeight;
       if (!width || !height) return null;
 
       scanCanvas.width = width;
       scanCanvas.height = height;
-      scanContext.drawImage(video, 0, 0, width, height);
+      scanContext.drawImage(activeVideo, 0, 0, width, height);
       const imageData = scanContext.getImageData(0, 0, width, height);
       const result = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
       return result ? result.data : null;
@@ -912,6 +1073,9 @@
 
     async function startScanner() {
       if (scanning) return;
+      if (scannerMode !== 'assign-code') {
+        activeVideo = video;
+      }
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         setStatus('このブラウザはカメラに対応していません。', 'error');
         return;
@@ -919,7 +1083,7 @@
 
       try {
         currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        video.srcObject = currentStream;
+        activeVideo.srcObject = currentStream;
         scanning = true;
         startScanButton.disabled = true;
         stopScanButton.disabled = false;
@@ -936,7 +1100,11 @@
         currentStream.getTracks().forEach((track) => track.stop());
         currentStream = null;
       }
-      video.srcObject = null;
+      if (activeVideo) {
+        activeVideo.srcObject = null;
+      }
+      formScanPanel.hidden = true;
+      activeVideo = video;
       startScanButton.disabled = false;
       stopScanButton.disabled = true;
       setStatus('スキャンを停止しました。', 'info');
@@ -958,7 +1126,6 @@
         itemCodeInput.value = code;
         stopScanner();
         scannerMode = 'work';
-        switchView('admin-view');
         setStatus('読み取ったコードを管理コードに入れました。', 'success');
         return;
       }
@@ -1013,6 +1180,8 @@
     }
 
     function setEventListeners() {
+      residentForm.addEventListener('submit', handleResidentSubmit);
+      productForm.addEventListener('submit', handleProductSubmit);
       recordForm.addEventListener('submit', handleFormSubmit);
       generateCodeButton.addEventListener('click', handleGenerateCode);
       scanCodeForFormButton.addEventListener('click', handleScanCodeForForm);
@@ -1021,9 +1190,14 @@
         setStatus('編集を取り消しました。', 'info');
       });
       searchInput.addEventListener('input', renderRecords);
+      itemDetailInput.addEventListener('change', applySelectedProduct);
       sortSelect.addEventListener('change', renderRecords);
       startScanButton.addEventListener('click', startScanner);
       stopScanButton.addEventListener('click', stopScanner);
+      stopFormScanButton.addEventListener('click', () => {
+        scannerMode = 'work';
+        stopScanner();
+      });
       manualLookupButton.addEventListener('click', handleManualLookup);
       workRecordPreview.addEventListener('click', (event) => {
         const button = event.target.closest('[data-use-count]');
@@ -1040,6 +1214,8 @@
 
     function init() {
       loadRecords();
+      renderResidents();
+      renderProducts();
       renderRecords();
       setEventListeners();
       registerServiceWorker();
