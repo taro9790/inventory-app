@@ -59,6 +59,29 @@
       box-shadow: 0 1px 2px rgba(20, 38, 25, 0.06);
     }
 
+    .tab-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .tab-button {
+      background: #ffffff;
+      color: #24352b;
+      border-color: #c8d0c6;
+    }
+
+    .tab-button.active {
+      background: #1f6f54;
+      color: #ffffff;
+      border-color: #1f6f54;
+    }
+
+    .view[hidden] {
+      display: none;
+    }
+
     .form-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -263,6 +286,21 @@
       border: 1px solid #d9ded7;
     }
 
+    .work-card {
+      margin-top: 12px;
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px solid #d9ded7;
+      background: #ffffff;
+    }
+
+    .quantity-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+
     .status.success { border-color: #77ad88; color: #174c2b; }
     .status.error { border-color: #de9898; color: #8c1d1d; }
     .status.warning { border-color: #e2c06c; color: #704c00; }
@@ -273,11 +311,11 @@
     }
 
     @media (max-width: 760px) {
-      .form-grid, .summary-grid, .toolbar, .stats-row, .record-actions {
+      .form-grid, .summary-grid, .toolbar, .stats-row, .record-actions, .quantity-row {
         grid-template-columns: 1fr;
       }
 
-      .button-row button, .scan-controls button, .record-actions button {
+      .button-row button, .scan-controls button, .record-actions button, .tab-button {
         width: 100%;
       }
     }
@@ -290,102 +328,114 @@
       <p class="lead">介護施設の利用者さんごとに、おむつ類の現在庫・使用枚数・ご家族への請求予定額を確認できます。</p>
     </header>
 
-    <section class="panel">
-      <h2>利用者さんの用品を登録</h2>
-      <form id="record-form">
-        <div class="form-grid">
-          <label>利用者名
-            <input type="text" id="resident-name" placeholder="例：山田 花子" required />
-          </label>
-          <label>用品種別
-            <select id="item-type">
-              <option value="テープ式おむつ">テープ式おむつ</option>
-              <option value="パンツ式おむつ">パンツ式おむつ</option>
-              <option value="尿取りパッド">尿取りパッド</option>
-              <option value="フラットタイプ">フラットタイプ</option>
-              <option value="その他">その他</option>
-            </select>
-          </label>
-          <label>サイズ・商品名
-            <input type="text" id="item-detail" placeholder="例：Mサイズ / 夜用パッド" />
-          </label>
-          <label>管理コード
-            <input type="text" id="item-code" placeholder="自動生成できます" />
-          </label>
-          <label>現在庫
-            <input type="number" id="stock-count" value="0" min="0" required />
-          </label>
-          <label>今月の使用枚数
-            <input type="number" id="used-count" value="0" min="0" required />
-          </label>
-          <label>1枚あたり単価
-            <input type="number" id="unit-price" value="0" min="0" step="1" />
-          </label>
-          <label class="full-span">メモ
-            <textarea id="memo" placeholder="例：ご家族持ち込み、施設購入、次回補充予定など"></textarea>
-          </label>
+    <nav class="tab-row" aria-label="画面切り替え">
+      <button type="button" class="tab-button active" data-view="work-view">作業する</button>
+      <button type="button" class="tab-button" data-view="admin-view">登録・管理</button>
+    </nav>
+
+    <div id="work-view" class="view">
+      <section class="panel scanner-panel">
+        <h2>作業する</h2>
+        <p class="lead">QRや管理コードで用品を呼び出して、使用枚数を選びます。</p>
+        <div class="scan-controls">
+          <button id="start-scan">スキャン開始</button>
+          <button id="stop-scan" class="secondary-button" disabled>停止</button>
+        </div>
+        <video id="video" autoplay muted playsinline></video>
+        <div class="scan-result">
+          <strong>読み取り結果:</strong>
+          <span id="scan-output">なし</span>
         </div>
         <div class="button-row">
-          <button type="button" id="generate-code" class="secondary-button">管理コード生成</button>
-          <button type="submit">登録する</button>
+          <input type="text" id="manual-code" placeholder="管理コードを手入力" />
+          <button id="manual-lookup" class="secondary-button">検索</button>
         </div>
-      </form>
-    </section>
+        <div id="work-record-preview" class="work-card">
+          <p class="empty">QRを読み取るか、管理コードを入力してください。</p>
+        </div>
+        <div id="status-message" class="status">準備完了</div>
+      </section>
+    </div>
 
-    <section class="panel">
-      <h2>集計</h2>
-      <div class="summary-grid">
-        <div class="summary-card">
-          <strong id="total-residents">0</strong>
-          <span>利用者数</span>
-        </div>
-        <div class="summary-card">
-          <strong id="total-records">0</strong>
-          <span>登録用品</span>
-        </div>
-        <div class="summary-card">
-          <strong id="total-used">0</strong>
-          <span>今月の使用枚数</span>
-        </div>
-        <div class="summary-card">
-          <strong id="total-billing">0円</strong>
-          <span>請求予定額</span>
-        </div>
-      </div>
-    </section>
+    <div id="admin-view" class="view" hidden>
+      <section class="panel">
+        <h2>利用者さんの用品を登録</h2>
+        <form id="record-form">
+          <div class="form-grid">
+            <label>利用者名
+              <input type="text" id="resident-name" placeholder="例：山田 花子" required />
+            </label>
+            <label>用品種別
+              <select id="item-type">
+                <option value="テープ式おむつ">テープ式おむつ</option>
+                <option value="パンツ式おむつ">パンツ式おむつ</option>
+                <option value="尿取りパッド">尿取りパッド</option>
+                <option value="フラットタイプ">フラットタイプ</option>
+                <option value="その他">その他</option>
+              </select>
+            </label>
+            <label>サイズ・商品名
+              <input type="text" id="item-detail" placeholder="例：Mサイズ / 夜用パッド" />
+            </label>
+            <label>管理コード
+              <input type="text" id="item-code" placeholder="自動生成できます" />
+            </label>
+            <label>現在庫
+              <input type="number" id="stock-count" value="0" min="0" required />
+            </label>
+            <label>今月の使用枚数
+              <input type="number" id="used-count" value="0" min="0" required />
+            </label>
+            <label>1枚あたり単価
+              <input type="number" id="unit-price" value="0" min="0" step="1" />
+            </label>
+            <label class="full-span">メモ
+              <textarea id="memo" placeholder="例：ご家族持ち込み、施設購入、次回補充予定など"></textarea>
+            </label>
+          </div>
+          <div class="button-row">
+            <button type="button" id="generate-code" class="secondary-button">管理コード生成</button>
+            <button type="submit">登録する</button>
+          </div>
+        </form>
+      </section>
 
-    <section class="panel">
-      <h2>利用者別一覧</h2>
-      <div class="toolbar">
-        <input type="text" id="search-input" placeholder="利用者名・用品・管理コードで検索" />
-        <select id="sort-select">
-          <option value="resident">利用者名順</option>
-          <option value="low-stock">在庫が少ない順</option>
-          <option value="billing">請求額が高い順</option>
-          <option value="updated">更新が新しい順</option>
-        </select>
-      </div>
-      <div id="record-list" class="record-list"></div>
-    </section>
+      <section class="panel">
+        <h2>集計</h2>
+        <div class="summary-grid">
+          <div class="summary-card">
+            <strong id="total-residents">0</strong>
+            <span>利用者数</span>
+          </div>
+          <div class="summary-card">
+            <strong id="total-records">0</strong>
+            <span>登録用品</span>
+          </div>
+          <div class="summary-card">
+            <strong id="total-used">0</strong>
+            <span>今月の使用枚数</span>
+          </div>
+          <div class="summary-card">
+            <strong id="total-billing">0円</strong>
+            <span>請求予定額</span>
+          </div>
+        </div>
+      </section>
 
-    <section class="panel scanner-panel">
-      <h2>QRで検索</h2>
-      <p class="lead">QRを読み取ると、該当する利用者さんの用品カードを表示します。誤登録防止のため、読み取りだけでは使用枚数は増えません。</p>
-      <div class="scan-controls">
-        <button id="start-scan">スキャン開始</button>
-        <button id="stop-scan" class="secondary-button" disabled>停止</button>
-      </div>
-      <video id="video" autoplay muted playsinline></video>
-      <div class="scan-result">
-        <strong>読み取り結果:</strong>
-        <span id="scan-output">なし</span>
-      </div>
-      <div class="button-row">
-        <input type="text" id="manual-code" placeholder="管理コードを手入力" />
-        <button id="manual-lookup" class="secondary-button">検索</button>
-      </div>
-      <div id="status-message" class="status">準備完了</div>
-    </section>
+      <section class="panel">
+        <h2>利用者別一覧</h2>
+        <div class="toolbar">
+          <input type="text" id="search-input" placeholder="利用者名・用品・管理コードで検索" />
+          <select id="sort-select">
+            <option value="resident">利用者名順</option>
+            <option value="low-stock">在庫が少ない順</option>
+            <option value="billing">請求額が高い順</option>
+            <option value="updated">更新が新しい順</option>
+          </select>
+        </div>
+        <div id="record-list" class="record-list"></div>
+      </section>
+    </div>
   </main>
 
   <script src="jsQR.js"></script>
@@ -417,6 +467,9 @@
     const manualCodeInput = document.getElementById('manual-code');
     const manualLookupButton = document.getElementById('manual-lookup');
     const statusMessage = document.getElementById('status-message');
+    const workRecordPreview = document.getElementById('work-record-preview');
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const views = document.querySelectorAll('.view');
 
     let records = [];
     let currentStream = null;
@@ -424,6 +477,7 @@
     let scanCanvas = null;
     let scanContext = null;
     let lastScannedCode = '';
+    let activeWorkRecordId = '';
 
     function yen(value) {
       return `${Number(value || 0).toLocaleString('ja-JP')}円`;
@@ -559,6 +613,32 @@
       updateSummary();
     }
 
+    function renderWorkRecord(record) {
+      if (!record) {
+        workRecordPreview.innerHTML = '<p class="empty">QRを読み取るか、管理コードを入力してください。</p>';
+        activeWorkRecordId = '';
+        return;
+      }
+
+      activeWorkRecordId = record.id;
+      workRecordPreview.innerHTML = `
+        <h3>${escapeHtml(record.residentName)}</h3>
+        <p class="record-meta">${escapeHtml(record.itemType)} ${escapeHtml(record.itemDetail)}<br>管理コード: ${escapeHtml(record.code)}</p>
+        <div class="stats-row">
+          <div class="stat"><strong>${Number(record.stockCount || 0)}</strong><span>現在庫</span></div>
+          <div class="stat"><strong>${Number(record.usedCount || 0)}</strong><span>今月使用</span></div>
+          <div class="stat"><strong>${yen(record.unitPrice)}</strong><span>1枚単価</span></div>
+          <div class="stat"><strong>${yen(getBilling(record))}</strong><span>請求予定</span></div>
+        </div>
+        <div class="quantity-row">
+          <button type="button" data-use-count="1">1枚使用</button>
+          <button type="button" data-use-count="2">2枚使用</button>
+          <button type="button" data-use-count="3">3枚使用</button>
+          <button type="button" data-use-count="4">4枚使用</button>
+        </div>
+      `;
+    }
+
     function touch(record) {
       record.updatedAt = new Date().toISOString();
     }
@@ -618,6 +698,27 @@
 
       saveRecords();
       renderRecords();
+    }
+
+    function registerUseCount(count) {
+      const record = records.find((entry) => entry.id === activeWorkRecordId);
+      if (!record) {
+        setStatus('先にQRか管理コードで用品を選んでください。', 'warning');
+        return;
+      }
+
+      if (Number(record.stockCount || 0) < count) {
+        setStatus('在庫数より多い枚数は登録できません。', 'warning');
+        return;
+      }
+
+      record.stockCount = Number(record.stockCount || 0) - count;
+      record.usedCount = Number(record.usedCount || 0) + count;
+      touch(record);
+      saveRecords();
+      renderRecords();
+      renderWorkRecord(record);
+      setStatus(`${record.residentName}さんの使用を${count}枚登録しました。`, 'success');
     }
 
     function handleFormSubmit(event) {
@@ -771,6 +872,7 @@
       searchInput.value = '';
       sortSelect.value = 'resident';
       renderRecords();
+      renderWorkRecord(found);
       const card = document.querySelector(`.record-card[data-id='${found.id}']`);
       if (card) {
         card.classList.add('found');
@@ -789,6 +891,15 @@
       highlightRecord(code);
     }
 
+    function switchView(viewId) {
+      views.forEach((view) => {
+        view.hidden = view.id !== viewId;
+      });
+      tabButtons.forEach((button) => {
+        button.classList.toggle('active', button.dataset.view === viewId);
+      });
+    }
+
     function registerServiceWorker() {
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('service-worker.js').catch(() => {});
@@ -803,6 +914,14 @@
       startScanButton.addEventListener('click', startScanner);
       stopScanButton.addEventListener('click', stopScanner);
       manualLookupButton.addEventListener('click', handleManualLookup);
+      workRecordPreview.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-use-count]');
+        if (!button) return;
+        registerUseCount(Number(button.dataset.useCount));
+      });
+      tabButtons.forEach((button) => {
+        button.addEventListener('click', () => switchView(button.dataset.view));
+      });
       window.addEventListener('beforeunload', () => {
         if (currentStream) currentStream.getTracks().forEach((track) => track.stop());
       });
