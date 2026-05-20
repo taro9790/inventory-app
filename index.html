@@ -152,6 +152,7 @@
     .status.success { border-color: #77ad88; color: #174c2b; }
     .status.warning { border-color: #e2c06c; color: #704c00; }
     .status.error { border-color: #de9898; color: #8c1d1d; }
+    .scan-feedback { margin-top: 8px; }
 
     @media (max-width: 720px) {
       .grid, .quantity-row { grid-template-columns: 1fr; }
@@ -183,6 +184,7 @@
 
         <div id="work-scan-box" class="scan-box" hidden>
           <video id="work-video" autoplay muted playsinline></video>
+          <p id="work-scan-feedback" class="meta scan-feedback">カメラ起動待ち</p>
         </div>
 
         <div class="button-row">
@@ -263,6 +265,7 @@
 
         <div id="admin-scan-box" class="scan-box" hidden>
           <video id="admin-video" autoplay muted playsinline></video>
+          <p id="admin-scan-feedback" class="meta scan-feedback">カメラ起動待ち</p>
           <div class="button-row">
             <button type="button" id="stop-admin-scan" class="secondary">読取を停止</button>
           </div>
@@ -307,6 +310,8 @@
     const adminVideo = document.getElementById('admin-video');
     const workScanBox = document.getElementById('work-scan-box');
     const adminScanBox = document.getElementById('admin-scan-box');
+    const workScanFeedback = document.getElementById('work-scan-feedback');
+    const adminScanFeedback = document.getElementById('admin-scan-feedback');
     const startWorkScanButton = document.getElementById('start-work-scan');
     const stopWorkScanButton = document.getElementById('stop-work-scan');
     const scanProductCodeButton = document.getElementById('scan-product-code');
@@ -326,6 +331,10 @@
     let scanContext = null;
     let lastCode = '';
     let lastCodeAt = 0;
+
+    function getScanFeedback() {
+      return scanMode === 'admin' ? adminScanFeedback : workScanFeedback;
+    }
 
     function setStatus(text, type = 'info') {
       statusBox.textContent = text;
@@ -460,7 +469,7 @@
       productPriceInput.value = 0;
       saveData();
       renderProducts();
-      setStatus('商品を追加しました。', 'success');
+      setStatus(`商品を追加しました: ${name} / ${code}`, 'success');
     }
 
     function findProductByCode(code) {
@@ -548,24 +557,33 @@
       activeVideo = mode === 'admin' ? adminVideo : workVideo;
       lastCode = '';
       lastCodeAt = 0;
+      workScanBox.hidden = mode !== 'work';
+      adminScanBox.hidden = mode !== 'admin';
+      getScanFeedback().textContent = 'カメラを起動しています...';
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setStatus('このブラウザはカメラに対応していません。', 'error');
+        getScanFeedback().textContent = 'このブラウザはカメラに対応していません。';
+        setStatus('このブラウザはカメラに対応していません。HTTPSのURLで開いているか確認してください。', 'error');
         return;
       }
 
       try {
-        currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        try {
+          currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } });
+        } catch (firstError) {
+          currentStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        }
         activeVideo.srcObject = currentStream;
+        await activeVideo.play();
         scanning = true;
-        workScanBox.hidden = mode !== 'work';
-        adminScanBox.hidden = mode !== 'admin';
         startWorkScanButton.disabled = mode === 'work';
         stopWorkScanButton.disabled = mode !== 'work';
+        getScanFeedback().textContent = '認識待ちです。バーコード/QRをカメラに映してください。';
         setStatus('読み取り中です。', 'info');
         requestAnimationFrame(scanLoop);
       } catch (error) {
-        setStatus('カメラの起動に失敗しました。', 'error');
+        getScanFeedback().textContent = 'カメラを起動できませんでした。';
+        setStatus('カメラの起動に失敗しました。ブラウザのカメラ許可とHTTPSのURLを確認してください。', 'error');
       }
     }
 
@@ -578,6 +596,8 @@
       activeVideo.srcObject = null;
       workScanBox.hidden = true;
       adminScanBox.hidden = true;
+      workScanFeedback.textContent = 'カメラ起動待ち';
+      adminScanFeedback.textContent = 'カメラ起動待ち';
       startWorkScanButton.disabled = false;
       stopWorkScanButton.disabled = true;
       setStatus('読み取りを停止しました。', 'info');
@@ -591,13 +611,17 @@
         lastCode = code;
         lastCodeAt = now;
         if (scanMode === 'admin') {
+          adminScanFeedback.textContent = `認識しました: ${code}`;
           productCodeInput.value = code;
           stopScanner();
-          setStatus('商品コードを入力しました。', 'success');
+          setStatus(`商品コードを入力しました: ${code}`, 'success');
         } else {
+          workScanFeedback.textContent = `認識しました: ${code}`;
           manualCodeInput.value = code;
           findProductByCode(code);
         }
+      } else if (!code && scanning) {
+        getScanFeedback().textContent = '認識待ちです。バーコード/QRをカメラに映してください。';
       }
       requestAnimationFrame(scanLoop);
     }
