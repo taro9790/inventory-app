@@ -341,10 +341,8 @@
     <div id="status" class="status">準備完了</div>
   </main>
 
-  <script src="qrcode.min.js"></script>
-  <script src="jsQR.js"></script>
   <script>
-    const APP_VERSION = '2026-05-20 ＋−枚数版';
+    const APP_VERSION = '2026-05-20 カメラ復旧版';
     const RESIDENTS_KEY = 'diaper-demo-residents-v2';
     const PRODUCTS_KEY = 'diaper-demo-products-v2';
     const USAGES_KEY = 'diaper-demo-usages-v2';
@@ -553,22 +551,69 @@
       box.hidden = false;
     }
 
-    function ensureQrReader() {
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = () => reject(new Error(`${src} を読み込めませんでした`));
+        document.head.appendChild(script);
+      });
+    }
+
+    async function ensureQrReader() {
       if (window.jsQR) return true;
-      setStatus('QR読み取り部品を読み込めませんでした。jsQR.js を一緒にアップロードしてください。', 'error');
+
+      const sources = [
+        'jsQR.js',
+        'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js',
+        'https://unpkg.com/jsqr@1.4.0/dist/jsQR.js',
+      ];
+
+      for (const src of sources) {
+        try {
+          await loadScript(src);
+          if (window.jsQR) return true;
+        } catch (error) {
+          // Try the next source.
+        }
+      }
+
+      setStatus('QR読み取り部品を読み込めませんでした。通信状態を確認してください。', 'error');
       return false;
     }
 
-    function ensureQrGenerator() {
+    async function ensureQrGenerator() {
       if (window.QRCode && typeof QRCode.toCanvas === 'function') return true;
-      setStatus('QR発行部品を読み込めませんでした。qrcode.min.js を一緒にアップロードしてください。', 'error');
+
+      const sources = [
+        'qrcode.min.js',
+        'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js',
+        'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js',
+      ];
+
+      for (const src of sources) {
+        try {
+          await loadScript(src);
+          if (window.QRCode && typeof QRCode.toCanvas === 'function') return true;
+        } catch (error) {
+          // Try the next source.
+        }
+      }
+
+      setStatus('QR発行部品を読み込めませんでした。通信状態を確認してください。', 'error');
       return false;
     }
 
     async function openCamera() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('このページではカメラ機能を使えません。HTTPSで開いているか確認してください。');
+      }
+
       const configs = [
         { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
         { video: { facingMode: 'environment' } },
+        { video: { facingMode: 'user' } },
         { video: true },
       ];
       let lastError = null;
@@ -583,7 +628,9 @@
     }
 
     async function startScanner(mode) {
-      if (scannerStopping || !ensureQrReader()) return;
+      if (scannerStopping) return;
+      const qrReady = await ensureQrReader();
+      if (!qrReady) return;
       if (currentStream) await stopScanner({ silent: true });
 
       scanMode = mode;
@@ -618,7 +665,17 @@
         const message = error && error.message ? error.message : String(error);
         getScanFeedback().textContent = `カメラを起動できませんでした: ${message}`;
         setStatus('カメラ許可、HTTPS、別アプリのカメラ使用を確認してください。', 'error');
-        await stopScanner({ silent: true });
+        setScanButtons('');
+        if (currentStream) {
+          currentStream.getTracks().forEach((track) => track.stop());
+          currentStream = null;
+        }
+        if (activeVideo) {
+          activeVideo.srcObject = null;
+          activeVideo = null;
+        }
+        workReader.innerHTML = '';
+        adminReader.innerHTML = '';
       }
     }
 
@@ -714,7 +771,8 @@
         setStatus('先にシリアルNOを発行するか、シリアルNOを入力してください。', 'warning');
         return;
       }
-      if (!ensureQrGenerator()) return;
+      const qrReady = await ensureQrGenerator();
+      if (!qrReady) return;
 
       productQrText.textContent = `シリアルNO: ${code}`;
       productQrPreview.hidden = false;
