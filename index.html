@@ -239,7 +239,7 @@
 
     .record-actions {
       display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 8px;
     }
 
@@ -394,8 +394,10 @@
             </label>
           </div>
           <div class="button-row">
+            <button type="button" id="scan-code-for-form" class="secondary-button">バーコード/QR読取</button>
             <button type="button" id="generate-code" class="secondary-button">管理コード生成</button>
-            <button type="submit">登録する</button>
+            <button type="submit" id="submit-record">登録する</button>
+            <button type="button" id="cancel-edit" class="secondary-button" hidden>編集をやめる</button>
           </div>
         </form>
       </section>
@@ -452,7 +454,10 @@
     const usedCountInput = document.getElementById('used-count');
     const unitPriceInput = document.getElementById('unit-price');
     const memoInput = document.getElementById('memo');
+    const scanCodeForFormButton = document.getElementById('scan-code-for-form');
     const generateCodeButton = document.getElementById('generate-code');
+    const submitRecordButton = document.getElementById('submit-record');
+    const cancelEditButton = document.getElementById('cancel-edit');
     const totalResidents = document.getElementById('total-residents');
     const totalRecords = document.getElementById('total-records');
     const totalUsed = document.getElementById('total-used');
@@ -478,6 +483,9 @@
     let scanContext = null;
     let lastScannedCode = '';
     let activeWorkRecordId = '';
+    let editingRecordId = '';
+    let scannerMode = 'work';
+    let barcodeDetector = null;
 
     function yen(value) {
       return `${Number(value || 0).toLocaleString('ja-JP')}円`;
@@ -592,6 +600,7 @@
           </div>
           ${record.memo ? `<p class="record-meta">メモ: ${escapeHtml(record.memo)}</p>` : ''}
           <div class="record-actions">
+            <button type="button" data-action="edit" data-id="${record.id}" class="secondary-button">編集</button>
             <button type="button" data-action="use" data-id="${record.id}">使用 +1</button>
             <button type="button" data-action="undo-use" data-id="${record.id}" class="secondary-button">使用取消</button>
             <button type="button" data-action="restock-one" data-id="${record.id}" class="secondary-button">入庫 +1</button>
@@ -650,6 +659,11 @@
       const record = records.find((entry) => entry.id === button.dataset.id);
       if (!record) return;
 
+      if (button.dataset.action === 'edit') {
+        startEditRecord(record);
+        return;
+      }
+
       if (button.dataset.action === 'use') {
         if (Number(record.stockCount || 0) <= 0) {
           setStatus('在庫が0のため、使用登録できません。先に入庫してください。', 'warning');
@@ -700,6 +714,33 @@
       renderRecords();
     }
 
+    function startEditRecord(record) {
+      editingRecordId = record.id;
+      residentNameInput.value = record.residentName;
+      itemTypeInput.value = record.itemType;
+      itemDetailInput.value = record.itemDetail || '';
+      itemCodeInput.value = record.code;
+      stockCountInput.value = Number(record.stockCount || 0);
+      usedCountInput.value = Number(record.usedCount || 0);
+      unitPriceInput.value = Number(record.unitPrice || 0);
+      memoInput.value = record.memo || '';
+      submitRecordButton.textContent = '編集を保存';
+      cancelEditButton.hidden = false;
+      switchView('admin-view');
+      recordForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setStatus('編集内容を入力して保存してください。', 'info');
+    }
+
+    function cancelEdit() {
+      editingRecordId = '';
+      recordForm.reset();
+      stockCountInput.value = 0;
+      usedCountInput.value = 0;
+      unitPriceInput.value = 0;
+      submitRecordButton.textContent = '登録する';
+      cancelEditButton.hidden = true;
+    }
+
     function registerUseCount(count) {
       const record = records.find((entry) => entry.id === activeWorkRecordId);
       if (!record) {
@@ -739,8 +780,34 @@
         code = generateCode();
       }
 
-      if (records.some((record) => record.code === code)) {
+      if (records.some((record) => record.code === code && record.id !== editingRecordId)) {
         setStatus('同じ管理コードがすでに登録されています。別のコードにしてください。', 'warning');
+        return;
+      }
+
+      if (editingRecordId) {
+        const target = records.find((record) => record.id === editingRecordId);
+        if (!target) {
+          setStatus('編集対象が見つかりません。', 'warning');
+          return;
+        }
+
+        target.residentName = residentName;
+        target.itemType = itemTypeInput.value;
+        target.itemDetail = itemDetailInput.value.trim();
+        target.code = code;
+        target.stockCount = stockCount;
+        target.usedCount = usedCount;
+        target.unitPrice = unitPrice;
+        target.memo = memoInput.value.trim();
+        touch(target);
+        saveRecords();
+        renderRecords();
+        if (target.id === activeWorkRecordId) {
+          renderWorkRecord(target);
+        }
+        cancelEdit();
+        setStatus('編集を保存しました。', 'success');
         return;
       }
 
@@ -766,6 +833,14 @@
       usedCountInput.value = 0;
       unitPriceInput.value = 0;
       setStatus('登録しました。', 'success');
+    }
+
+    function handleScanCodeForForm() {
+      scannerMode = 'assign-code';
+      lastScannedCode = '';
+      switchView('work-view');
+      setStatus('読み取ったバーコード/QRを登録フォームの管理コードに入れます。', 'info');
+      startScanner();
     }
 
     function handleGenerateCode() {
@@ -802,8 +877,26 @@
       }
     }
 
-    function decodeWithJsQR() {
-      if (!window.jsQR || video.readyState !== HTMLMediaElement.HAVE_ENOUGH_DATA) return null;
+    async function decodeCode() {
+      if (video.readyState !== HTMLMediaElement.HAVE_ENOUGH_DATA) return null;
+
+      if ('BarcodeDetector' in window) {
+        try {
+          if (!barcodeDetector) {
+            barcodeDetector = new BarcodeDetector({
+              formats: ['qr_code', 'code_128', 'code_39', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'itf'],
+            });
+          }
+          const barcodes = await barcodeDetector.detect(video);
+          if (barcodes.length > 0) {
+            return barcodes[0].rawValue;
+          }
+        } catch (error) {
+          barcodeDetector = null;
+        }
+      }
+
+      if (!window.jsQR) return null;
       ensureScanCanvas();
       const width = video.videoWidth;
       const height = video.videoHeight;
@@ -849,15 +942,28 @@
       setStatus('スキャンを停止しました。', 'info');
     }
 
-    function scanLoop() {
+    async function scanLoop() {
       if (!scanning) return;
-      const code = decodeWithJsQR();
+      const code = await decodeCode();
       if (code && code !== lastScannedCode) {
         lastScannedCode = code;
         scanOutput.textContent = code;
-        highlightRecord(code);
+        handleScannedCode(code);
       }
       requestAnimationFrame(scanLoop);
+    }
+
+    function handleScannedCode(code) {
+      if (scannerMode === 'assign-code') {
+        itemCodeInput.value = code;
+        stopScanner();
+        scannerMode = 'work';
+        switchView('admin-view');
+        setStatus('読み取ったコードを管理コードに入れました。', 'success');
+        return;
+      }
+
+      highlightRecord(code);
     }
 
     function highlightRecord(code) {
@@ -909,6 +1015,11 @@
     function setEventListeners() {
       recordForm.addEventListener('submit', handleFormSubmit);
       generateCodeButton.addEventListener('click', handleGenerateCode);
+      scanCodeForFormButton.addEventListener('click', handleScanCodeForForm);
+      cancelEditButton.addEventListener('click', () => {
+        cancelEdit();
+        setStatus('編集を取り消しました。', 'info');
+      });
       searchInput.addEventListener('input', renderRecords);
       sortSelect.addEventListener('change', renderRecords);
       startScanButton.addEventListener('click', startScanner);
