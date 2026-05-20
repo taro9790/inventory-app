@@ -88,6 +88,31 @@
       gap: 12px;
     }
 
+    .master-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .mini-list {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .mini-item {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 7px 10px;
+      border-radius: 8px;
+      border: 1px solid #d9ded7;
+      background: #f4f6f2;
+      color: #34433a;
+      font-size: 0.9rem;
+    }
+
     label {
       display: block;
       font-size: 0.93rem;
@@ -311,7 +336,7 @@
     }
 
     @media (max-width: 760px) {
-      .form-grid, .summary-grid, .toolbar, .stats-row, .record-actions, .quantity-row {
+      .form-grid, .master-grid, .summary-grid, .toolbar, .stats-row, .record-actions, .quantity-row {
         grid-template-columns: 1fr;
       }
 
@@ -359,45 +384,45 @@
 
     <div id="admin-view" class="view" hidden>
       <section class="panel">
-        <h2>利用者登録</h2>
-        <form id="resident-form">
-          <div class="form-grid">
-            <label>利用者名
-              <input type="text" id="master-resident-name" placeholder="例：山田 花子" required />
-            </label>
+        <h2>基本登録</h2>
+        <div class="master-grid">
+          <div>
+            <form id="resident-form">
+              <label>利用者名
+                <input type="text" id="master-resident-name" placeholder="例：山田 花子" required />
+              </label>
+              <div class="button-row">
+                <button type="submit">追加</button>
+              </div>
+            </form>
+            <div id="resident-master-list" class="mini-list"></div>
           </div>
-          <div class="button-row">
-            <button type="submit">利用者を追加</button>
+          <div>
+            <form id="product-form">
+              <label>用品名
+                <input type="text" id="master-product-name" placeholder="例：夜用パッド M" required />
+              </label>
+              <div class="form-grid">
+                <label>種別
+                  <select id="master-product-type">
+                    <option value="尿取りパッド">尿取りパッド</option>
+                    <option value="テープ式おむつ">テープ式おむつ</option>
+                    <option value="パンツ式おむつ">パンツ式おむつ</option>
+                    <option value="フラットタイプ">フラットタイプ</option>
+                    <option value="その他">その他</option>
+                  </select>
+                </label>
+                <label>単価
+                  <input type="number" id="master-product-price" value="0" min="0" step="1" />
+                </label>
+              </div>
+              <div class="button-row">
+                <button type="submit">追加</button>
+              </div>
+            </form>
+            <div id="product-master-list" class="mini-list"></div>
           </div>
-        </form>
-        <div id="resident-master-list" class="record-list"></div>
-      </section>
-
-      <section class="panel">
-        <h2>用品登録</h2>
-        <form id="product-form">
-          <div class="form-grid">
-            <label>用品種別
-              <select id="master-product-type">
-                <option value="テープ式おむつ">テープ式おむつ</option>
-                <option value="パンツ式おむつ">パンツ式おむつ</option>
-                <option value="尿取りパッド">尿取りパッド</option>
-                <option value="フラットタイプ">フラットタイプ</option>
-                <option value="その他">その他</option>
-              </select>
-            </label>
-            <label>サイズ・商品名
-              <input type="text" id="master-product-name" placeholder="例：Mサイズ / 夜用パッド" required />
-            </label>
-            <label>1枚あたり単価
-              <input type="number" id="master-product-price" value="0" min="0" step="1" />
-            </label>
-          </div>
-          <div class="button-row">
-            <button type="submit">用品を追加</button>
-          </div>
-        </form>
-        <div id="product-master-list" class="record-list"></div>
+        </div>
       </section>
 
       <section class="panel">
@@ -549,6 +574,7 @@
     let scanCanvas = null;
     let scanContext = null;
     let lastScannedCode = '';
+    let lastScannedAt = 0;
     let activeWorkRecordId = '';
     let editingRecordId = '';
     let scannerMode = 'work';
@@ -662,20 +688,15 @@
     function renderResidents() {
       residentOptions.innerHTML = residents.map((resident) => `<option value="${escapeHtml(resident.name)}"></option>`).join('');
       residentMasterList.innerHTML = residents.length
-        ? residents.map((resident) => `<article class="record-card"><h3>${escapeHtml(resident.name)}</h3></article>`).join('')
-        : '<p class="empty">まだ利用者さんが登録されていません。</p>';
+        ? residents.map((resident) => `<span class="mini-item">${escapeHtml(resident.name)}</span>`).join('')
+        : '<span class="mini-item">未登録</span>';
     }
 
     function renderProducts() {
       productOptions.innerHTML = products.map((product) => `<option value="${escapeHtml(product.name)}"></option>`).join('');
       productMasterList.innerHTML = products.length
-        ? products.map((product) => `
-          <article class="record-card">
-            <h3>${escapeHtml(product.name)}</h3>
-            <p class="record-meta">${escapeHtml(product.type)} / ${yen(product.price)}</p>
-          </article>
-        `).join('')
-        : '<p class="empty">まだ用品が登録されていません。</p>';
+        ? products.map((product) => `<span class="mini-item">${escapeHtml(product.name)} / ${yen(product.price)}</span>`).join('')
+        : '<span class="mini-item">未登録</span>';
     }
 
     function renderRecords() {
@@ -998,6 +1019,7 @@
     function handleScanCodeForForm() {
       scannerMode = 'assign-code';
       lastScannedCode = '';
+      lastScannedAt = 0;
       activeVideo = formVideo;
       formScanPanel.hidden = false;
       setStatus('読み取ったバーコード/QRを登録フォームの管理コードに入れます。', 'info');
@@ -1073,6 +1095,7 @@
 
     async function startScanner() {
       if (scanning) return;
+      lastScannedAt = 0;
       if (scannerMode !== 'assign-code') {
         activeVideo = video;
       }
@@ -1113,8 +1136,10 @@
     async function scanLoop() {
       if (!scanning) return;
       const code = await decodeCode();
-      if (code && code !== lastScannedCode) {
+      const now = Date.now();
+      if (code && (code !== lastScannedCode || now - lastScannedAt > 1200)) {
         lastScannedCode = code;
+        lastScannedAt = now;
         scanOutput.textContent = code;
         handleScannedCode(code);
       }
