@@ -342,9 +342,9 @@
     <div id="status" class="status">準備完了</div>
   </main>
 
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="jsQR.js"></script>
   <script>
-    const APP_VERSION = '2026-05-20 QR作業読取版';
+    const APP_VERSION = '2026-05-20 QR認識表示版';
     const RESIDENTS_KEY = 'diaper-demo-residents-v2';
     const PRODUCTS_KEY = 'diaper-demo-products-v2';
     const USAGES_KEY = 'diaper-demo-usages-v2';
@@ -395,25 +395,17 @@
     let products = [];
     let usages = [];
     let selectedProduct = null;
+    let currentStream = null;
     let scanning = false;
     let scanMode = 'work';
-    let scanner = null;
+    let activeVideo = null;
+    let scanCanvas = null;
+    let scanContext = null;
+    let scanFrameId = 0;
     let scannerStopping = false;
     let lastCode = '';
     let lastCodeAt = 0;
     let scanWaitCount = 0;
-
-    const SUPPORTED_FORMATS = window.Html5QrcodeSupportedFormats || {};
-    const SCAN_FORMATS = [
-      SUPPORTED_FORMATS.QR_CODE,
-      SUPPORTED_FORMATS.EAN_13,
-      SUPPORTED_FORMATS.EAN_8,
-      SUPPORTED_FORMATS.CODE_128,
-      SUPPORTED_FORMATS.CODE_39,
-      SUPPORTED_FORMATS.UPC_A,
-      SUPPORTED_FORMATS.UPC_E,
-      SUPPORTED_FORMATS.ITF,
-    ].filter(Boolean);
 
     function getScanFeedback() {
       return scanMode === 'admin' ? adminScanFeedback : workScanFeedback;
@@ -425,7 +417,7 @@
 
     function showDetectedCode(code) {
       const box = getDetectedCodeBox();
-      box.textContent = `読み取り: ${code}`;
+      box.textContent = `QR認識しました: ${code}`;
       box.hidden = false;
     }
 
@@ -646,7 +638,7 @@
 
     async function startScanner(mode) {
       if (scannerStopping) return;
-      if (scanner) {
+      if (currentStream) {
         await stopScanner({ silent: true });
       }
       scanMode = mode;
@@ -660,87 +652,120 @@
       getScanFeedback().textContent = 'カメラを起動しています...';
       setScanButtons(mode);
 
-      if (!window.Html5Qrcode) {
-        getScanFeedback().textContent = '読み取りライブラリを読み込めませんでした。';
-        setStatus('読み取り機能の読み込みに失敗しました。通信状態を確認してください。', 'error');
+      if (!window.jsQR) {
+        getScanFeedback().textContent = 'QR読み取り部品を読み込めませんでした。';
+        setStatus('QR読み取り部品の読み込みに失敗しました。jsQR.js が同じ場所にあるか確認してください。', 'error');
         setScanButtons('');
         return;
       }
 
       try {
-        const readerId = mode === 'admin' ? 'admin-reader' : 'work-reader';
-        scanner = new Html5Qrcode(
-          readerId,
-          SCAN_FORMATS.length
-            ? { formatsToSupport: SCAN_FORMATS, verbose: false }
-            : { verbose: false }
-        );
-        scanning = true;
-        getScanFeedback().textContent = 'カメラを起動しています。許可が出たら許可してください。';
-        setStatus('読み取り中です。', 'info');
+        const reader = mode === 'admin' ? adminReader : workReader;
+        reader.innerHTML = '';
+        activeVideo = document.createElement('video');
+        activeVideo.autoplay = true;
+        activeVideo.muted = true;
+        activeVideo.playsInline = true;
+        activeVideo.setAttribute('playsinline', '');
+        reader.appendChild(activeVideo);
 
-        await startCameraWithFallback();
+        currentStream = await openCameraWithFallback();
+        activeVideo.srcObject = currentStream;
+        await activeVideo.play();
+
+        scanning = true;
+        getScanFeedback().textContent = 'カメラ起動OK。QR全体を中央に映してください。';
+        setStatus('QR読み取り中です。', 'info');
+        scanFrameId = requestAnimationFrame(scanLoop);
       } catch (error) {
         const message = error && error.message ? error.message : String(error);
         getScanFeedback().textContent = `カメラを起動できませんでした: ${message}`;
-        setStatus('カメラの起動に失敗しました。別画面のカメラを停止して、ブラウザのカメラ許可を確認してください。', 'error');
+        setStatus('カメラの起動に失敗しました。ブラウザのカメラ許可とHTTPSのURLを確認してください。', 'error');
         workScanBox.hidden = true;
         adminScanBox.hidden = true;
         setScanButtons('');
         scanning = false;
-        scanner = null;
+        currentStream = null;
       }
     }
 
-    async function startCameraWithFallback() {
-      const onScanFailure = () => {
-        scanWaitCount += 1;
-        if (scanWaitCount % 12 === 0) {
-          getScanFeedback().textContent = 'カメラは動いています。まだQRは読めていません。QR全体を明るく、中央に映してください。';
-        }
-      };
+    async function openCameraWithFallback() {
       const cameraConfigs = [
-        { facingMode: 'environment' },
-        { facingMode: { ideal: 'environment' } },
-        { facingMode: 'user' },
-        {},
+        { video: { facingMode: { exact: 'environment' } } },
+        { video: { facingMode: { ideal: 'environment' } } },
+        { video: { facingMode: 'user' } },
+        { video: true },
       ];
-      const scannerConfig = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-      };
       let lastError = null;
 
-      for (const cameraConfig of cameraConfigs) {
+      for (const constraints of cameraConfigs) {
         try {
-          await scanner.start(cameraConfig, scannerConfig, handleDecodedCode, onScanFailure);
-          return;
+          return await navigator.mediaDevices.getUserMedia(constraints);
         } catch (error) {
           lastError = error;
-          try {
-            await scanner.clear();
-          } catch (clearError) {
-            // Some browsers leave nothing to clear after a failed start.
-          }
         }
       }
 
       throw lastError || new Error('camera start failed');
     }
 
+    function ensureScanCanvas() {
+      if (!scanCanvas) {
+        scanCanvas = document.createElement('canvas');
+        scanContext = scanCanvas.getContext('2d');
+      }
+    }
+
+    function decodeQrFromVideo() {
+      if (!activeVideo || activeVideo.readyState !== HTMLMediaElement.HAVE_ENOUGH_DATA) return null;
+      const width = activeVideo.videoWidth;
+      const height = activeVideo.videoHeight;
+      if (!width || !height) return null;
+
+      ensureScanCanvas();
+      scanCanvas.width = width;
+      scanCanvas.height = height;
+      scanContext.drawImage(activeVideo, 0, 0, width, height);
+      const imageData = scanContext.getImageData(0, 0, width, height);
+      const result = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
+      return result ? result.data : null;
+    }
+
+    function scanLoop() {
+      if (!scanning) return;
+      const code = decodeQrFromVideo();
+      const now = Date.now();
+
+      if (code && (code !== lastCode || now - lastCodeAt > 1200)) {
+        handleDecodedCode(code);
+      } else if (!code) {
+        scanWaitCount += 1;
+        if (scanWaitCount % 30 === 0) {
+          getScanFeedback().textContent = 'カメラは動いています。まだQRは読めていません。QR全体を明るく、中央に映してください。';
+        }
+      }
+
+      scanFrameId = requestAnimationFrame(scanLoop);
+    }
+
     async function stopScanner(options = {}) {
       scannerStopping = true;
       scanning = false;
-      setScanButtons('');
-      if (scanner) {
-        try {
-          await scanner.stop();
-          await scanner.clear();
-        } catch (error) {
-          // Already stopped or not fully started.
-        }
-        scanner = null;
+      if (scanFrameId) {
+        cancelAnimationFrame(scanFrameId);
+        scanFrameId = 0;
       }
+      setScanButtons('');
+      if (currentStream) {
+        currentStream.getTracks().forEach((track) => track.stop());
+        currentStream = null;
+      }
+      if (activeVideo) {
+        activeVideo.srcObject = null;
+        activeVideo = null;
+      }
+      workReader.innerHTML = '';
+      adminReader.innerHTML = '';
       workScanBox.hidden = true;
       adminScanBox.hidden = true;
       workScanFeedback.textContent = 'カメラ起動待ち';
@@ -800,7 +825,7 @@
         button.addEventListener('click', () => registerUsage(Number(button.dataset.quantity)));
       });
       window.addEventListener('beforeunload', () => {
-        if (scanner) scanner.stop().catch(() => {});
+        if (currentStream) currentStream.getTracks().forEach((track) => track.stop());
       });
     }
 
