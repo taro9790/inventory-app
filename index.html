@@ -344,7 +344,7 @@
 
   <script src="jsQR.js"></script>
   <script>
-    const APP_VERSION = '2026-05-20 QR認識表示版';
+    const APP_VERSION = '2026-05-20 キャッシュ解除QR版';
     const RESIDENTS_KEY = 'diaper-demo-residents-v2';
     const PRODUCTS_KEY = 'diaper-demo-products-v2';
     const USAGES_KEY = 'diaper-demo-usages-v2';
@@ -431,6 +431,13 @@
     function setStatus(text, type = 'info') {
       statusBox.textContent = text;
       statusBox.className = `status ${type}`;
+    }
+
+    function disableServiceWorkerCache() {
+      if (!('serviceWorker' in navigator)) return;
+      navigator.serviceWorker.getRegistrations()
+        .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+        .catch(() => {});
     }
 
     function yen(value) {
@@ -830,6 +837,7 @@
     }
 
     function init() {
+      disableServiceWorkerCache();
       loadData();
       renderAll();
       initEvents();
