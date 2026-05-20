@@ -16,9 +16,9 @@
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; background: #f6f7f3; }
     h1, h2, h3, p { margin: 0; }
-    h1 { font-size: clamp(1.55rem, 4vw, 2.15rem); line-height: 1.2; }
-    h2 { font-size: 1.14rem; margin-bottom: 12px; }
-    h3 { font-size: 1.05rem; }
+    h1 { font-size: clamp(1.55rem, 4vw, 2.1rem); line-height: 1.2; }
+    h2 { font-size: 1.12rem; margin-bottom: 12px; }
+    h3 { font-size: 1.02rem; }
     p { line-height: 1.65; }
 
     .app-shell { max-width: 920px; margin: 0 auto; padding: 18px; }
@@ -80,7 +80,7 @@
     .secondary { background: #ffffff; color: #24352b; border-color: #c8d0c6; }
     .danger { background: #ffffff; color: #9f1d1d; border-color: #e6b8b8; }
     .active { background: #1f6f54; color: #ffffff; border-color: #1f6f54; }
-    .view[hidden], .scan-box[hidden] { display: none; }
+    .view[hidden], .scan-box[hidden], .qr-preview[hidden], .detected-code[hidden] { display: none; }
 
     .grid {
       display: grid;
@@ -96,17 +96,9 @@
       margin-top: 12px;
     }
 
-    .tag-list, .card-list {
-      display: grid;
-      gap: 10px;
-      margin-top: 12px;
-    }
-
-    .tag-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
+    .button-row input { flex: 1 1 220px; }
+    .card-list, .tag-list { display: grid; gap: 10px; margin-top: 12px; }
+    .tag-list { display: flex; flex-wrap: wrap; gap: 8px; }
 
     .tag {
       display: inline-flex;
@@ -130,14 +122,19 @@
     .meta { color: #526159; font-size: 0.92rem; margin-top: 4px; }
     .scan-reader {
       width: 100%;
-      min-height: 220px;
+      min-height: 260px;
       margin-top: 12px;
       border-radius: 8px;
       background: #111827;
       overflow: hidden;
     }
 
-    .scan-reader video { width: 100% !important; }
+    .scan-reader video {
+      display: block;
+      width: 100%;
+      max-height: 62vh;
+      object-fit: cover;
+    }
 
     .selected-product {
       margin-top: 12px;
@@ -149,9 +146,22 @@
 
     .quantity-row {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: 56px minmax(90px, 1fr) 56px minmax(120px, 1.4fr);
       gap: 8px;
       margin-top: 12px;
+      align-items: stretch;
+    }
+
+    .quantity-display {
+      display: grid;
+      place-items: center;
+      min-height: 46px;
+      border-radius: 8px;
+      border: 1px solid #c8d0c6;
+      background: #ffffff;
+      color: #17211a;
+      font-size: 1.25rem;
+      font-weight: 800;
     }
 
     .status {
@@ -165,7 +175,6 @@
     .status.success { border-color: #77ad88; color: #174c2b; }
     .status.warning { border-color: #e2c06c; color: #704c00; }
     .status.error { border-color: #de9898; color: #8c1d1d; }
-    .scan-feedback { margin-top: 8px; }
     .detected-code {
       margin-top: 8px;
       padding: 10px 12px;
@@ -185,8 +194,6 @@
       background: #f4f6f2;
     }
 
-    .qr-preview[hidden] { display: none; }
-
     .qr-preview canvas {
       display: block;
       width: 180px;
@@ -197,19 +204,12 @@
       border-radius: 8px;
     }
 
-    .qr-preview img {
-      display: block;
-      width: 180px;
-      max-width: 100%;
-      height: auto;
-      margin-top: 8px;
-      background: #ffffff;
-      border-radius: 8px;
-    }
-
     @media (max-width: 720px) {
-      .grid, .quantity-row { grid-template-columns: 1fr; }
-      .tabs, .button-row button { width: 100%; }
+      .grid { grid-template-columns: 1fr; }
+      .tabs { grid-template-columns: 1fr 1fr; }
+      .button-row button { width: 100%; }
+      .quantity-row { grid-template-columns: 56px minmax(80px, 1fr) 56px; }
+      #record-quantity { grid-column: 1 / -1; }
     }
   </style>
 </head>
@@ -217,7 +217,7 @@
   <main class="app-shell">
     <header>
       <h1>おむつ使用記録デモ</h1>
-      <p class="lead">商品バーコードを読み取り、利用者さんと使用枚数を選んで記録します。</p>
+      <p class="lead">商品QRまたはシリアルNOで商品を選び、利用者さんと枚数を記録します。</p>
       <div id="app-version" class="version">読み込み中</div>
     </header>
 
@@ -229,7 +229,7 @@
     <section id="work-view" class="view">
       <div class="panel">
         <h2>作業する</h2>
-        <p class="lead">商品QRを読み取るか、シリアルNOを入力してから、利用者さんと枚数を選びます。</p>
+        <p class="lead">商品QRを読むか、シリアルNOを入力してください。</p>
 
         <div class="button-row">
           <button type="button" id="start-work-scan">商品QRを読む</button>
@@ -238,12 +238,12 @@
 
         <div id="work-scan-box" class="scan-box" hidden>
           <div id="work-reader" class="scan-reader"></div>
-          <p id="work-scan-feedback" class="meta scan-feedback">カメラ起動待ち</p>
+          <p id="work-scan-feedback" class="meta">カメラ起動待ち</p>
           <div id="work-detected-code" class="detected-code" hidden></div>
         </div>
 
         <div class="button-row">
-          <input type="text" id="manual-code" placeholder="シリアルNOを入力 例: DP-ABCDEFGH" />
+          <input type="text" id="manual-code" placeholder="シリアルNOを入力 例: DP-ABCDEFGH" autocomplete="off" />
           <button type="button" id="manual-search" class="secondary">検索</button>
         </div>
 
@@ -261,10 +261,10 @@
         </div>
 
         <div class="quantity-row">
-          <button type="button" data-quantity="1">1枚</button>
-          <button type="button" data-quantity="2">2枚</button>
-          <button type="button" data-quantity="3">3枚</button>
-          <button type="button" data-quantity="4">4枚</button>
+          <button type="button" id="decrease-quantity" class="secondary">−</button>
+          <div id="quantity-display" class="quantity-display">1枚</div>
+          <button type="button" id="increase-quantity">＋</button>
+          <button type="button" id="record-quantity">記録する</button>
         </div>
       </div>
 
@@ -279,7 +279,7 @@
         <h2>利用者さん登録</h2>
         <form id="resident-form">
           <label>名前
-            <input type="text" id="resident-name" placeholder="例：山田 花子" required />
+            <input type="text" id="resident-name" placeholder="例: 山田 花子" required />
           </label>
           <div class="button-row">
             <button type="submit">追加</button>
@@ -293,10 +293,10 @@
         <form id="product-form">
           <div class="grid">
             <label>商品名
-              <input type="text" id="product-name" placeholder="例：夜用パッド M" required />
+              <input type="text" id="product-name" placeholder="例: 夜用パッド M" required />
             </label>
-            <label>バーコード / QRコード
-              <input type="text" id="product-code" placeholder="読み取り、または手入力" required />
+            <label>シリアルNO
+              <input type="text" id="product-code" placeholder="シリアルNO発行、QR読取、または手入力" required />
             </label>
             <label>種別
               <select id="product-type">
@@ -312,9 +312,9 @@
             </label>
           </div>
           <div class="button-row">
-            <button type="button" id="scan-product-code" class="secondary">バーコード/QR読取</button>
             <button type="button" id="make-serial-code" class="secondary">シリアルNO発行</button>
             <button type="button" id="make-product-qr" class="secondary">QR発行</button>
+            <button type="button" id="scan-product-code" class="secondary">QR読取</button>
             <button type="submit">商品を追加</button>
           </div>
         </form>
@@ -323,12 +323,11 @@
           <strong>発行QR</strong>
           <p id="product-qr-text" class="meta"></p>
           <canvas id="product-qr-canvas" width="180" height="180"></canvas>
-          <img id="product-qr-image" alt="発行QR" hidden />
         </div>
 
         <div id="admin-scan-box" class="scan-box" hidden>
           <div id="admin-reader" class="scan-reader"></div>
-          <p id="admin-scan-feedback" class="meta scan-feedback">カメラ起動待ち</p>
+          <p id="admin-scan-feedback" class="meta">カメラ起動待ち</p>
           <div id="admin-detected-code" class="detected-code" hidden></div>
           <div class="button-row">
             <button type="button" id="stop-admin-scan" class="secondary">読取を停止</button>
@@ -342,144 +341,72 @@
     <div id="status" class="status">準備完了</div>
   </main>
 
+  <script src="qrcode.min.js"></script>
   <script src="jsQR.js"></script>
   <script>
-    const APP_VERSION = '2026-05-20 jsQR自動読込版';
+    const APP_VERSION = '2026-05-20 作り直し版';
     const RESIDENTS_KEY = 'diaper-demo-residents-v2';
     const PRODUCTS_KEY = 'diaper-demo-products-v2';
     const USAGES_KEY = 'diaper-demo-usages-v2';
 
+    const $ = (id) => document.getElementById(id);
     const tabButtons = document.querySelectorAll('.tab-button');
     const views = document.querySelectorAll('.view');
-    const appVersion = document.getElementById('app-version');
-    const statusBox = document.getElementById('status');
-
-    const residentForm = document.getElementById('resident-form');
-    const residentNameInput = document.getElementById('resident-name');
-    const residentList = document.getElementById('resident-list');
-    const workResidentSelect = document.getElementById('work-resident');
-
-    const productForm = document.getElementById('product-form');
-    const productNameInput = document.getElementById('product-name');
-    const productCodeInput = document.getElementById('product-code');
-    const productTypeInput = document.getElementById('product-type');
-    const productPriceInput = document.getElementById('product-price');
-    const productList = document.getElementById('product-list');
-
-    const selectedProductBox = document.getElementById('selected-product');
-    const usageList = document.getElementById('usage-list');
-    const manualCodeInput = document.getElementById('manual-code');
-    const manualSearchButton = document.getElementById('manual-search');
-    const staffNameInput = document.getElementById('staff-name');
-
-    const workReader = document.getElementById('work-reader');
-    const adminReader = document.getElementById('admin-reader');
-    const workScanBox = document.getElementById('work-scan-box');
-    const adminScanBox = document.getElementById('admin-scan-box');
-    const workScanFeedback = document.getElementById('work-scan-feedback');
-    const adminScanFeedback = document.getElementById('admin-scan-feedback');
-    const workDetectedCode = document.getElementById('work-detected-code');
-    const adminDetectedCode = document.getElementById('admin-detected-code');
-    const startWorkScanButton = document.getElementById('start-work-scan');
-    const stopWorkScanButton = document.getElementById('stop-work-scan');
-    const scanProductCodeButton = document.getElementById('scan-product-code');
-    const stopAdminScanButton = document.getElementById('stop-admin-scan');
-    const makeSerialCodeButton = document.getElementById('make-serial-code');
-    const makeProductQrButton = document.getElementById('make-product-qr');
-    const productQrPreview = document.getElementById('product-qr-preview');
-    const productQrText = document.getElementById('product-qr-text');
-    const productQrCanvas = document.getElementById('product-qr-canvas');
-    const productQrImage = document.getElementById('product-qr-image');
+    const appVersion = $('app-version');
+    const statusBox = $('status');
+    const residentForm = $('resident-form');
+    const residentNameInput = $('resident-name');
+    const residentList = $('resident-list');
+    const workResidentSelect = $('work-resident');
+    const productForm = $('product-form');
+    const productNameInput = $('product-name');
+    const productCodeInput = $('product-code');
+    const productTypeInput = $('product-type');
+    const productPriceInput = $('product-price');
+    const productList = $('product-list');
+    const selectedProductBox = $('selected-product');
+    const usageList = $('usage-list');
+    const manualCodeInput = $('manual-code');
+    const staffNameInput = $('staff-name');
+    const workReader = $('work-reader');
+    const adminReader = $('admin-reader');
+    const workScanBox = $('work-scan-box');
+    const adminScanBox = $('admin-scan-box');
+    const workScanFeedback = $('work-scan-feedback');
+    const adminScanFeedback = $('admin-scan-feedback');
+    const workDetectedCode = $('work-detected-code');
+    const adminDetectedCode = $('admin-detected-code');
+    const startWorkScanButton = $('start-work-scan');
+    const stopWorkScanButton = $('stop-work-scan');
+    const scanProductCodeButton = $('scan-product-code');
+    const stopAdminScanButton = $('stop-admin-scan');
+    const productQrPreview = $('product-qr-preview');
+    const productQrText = $('product-qr-text');
+    const productQrCanvas = $('product-qr-canvas');
+    const decreaseQuantityButton = $('decrease-quantity');
+    const increaseQuantityButton = $('increase-quantity');
+    const recordQuantityButton = $('record-quantity');
+    const quantityDisplay = $('quantity-display');
 
     let residents = [];
     let products = [];
     let usages = [];
     let selectedProduct = null;
+    let selectedQuantity = 1;
+    let scanMode = '';
     let currentStream = null;
-    let scanning = false;
-    let scanMode = 'work';
     let activeVideo = null;
     let scanCanvas = null;
     let scanContext = null;
     let scanFrameId = 0;
-    let scannerStopping = false;
     let lastCode = '';
     let lastCodeAt = 0;
     let scanWaitCount = 0;
-
-    function getScanFeedback() {
-      return scanMode === 'admin' ? adminScanFeedback : workScanFeedback;
-    }
-
-    function getDetectedCodeBox() {
-      return scanMode === 'admin' ? adminDetectedCode : workDetectedCode;
-    }
-
-    function showDetectedCode(code) {
-      const box = getDetectedCodeBox();
-      box.textContent = `QR認識しました: ${code}`;
-      box.hidden = false;
-    }
-
-    function setScanButtons(activeMode = '') {
-      startWorkScanButton.disabled = activeMode === 'work' || scannerStopping;
-      stopWorkScanButton.disabled = activeMode !== 'work' || scannerStopping;
-      scanProductCodeButton.disabled = activeMode === 'admin' || scannerStopping;
-      stopAdminScanButton.disabled = activeMode !== 'admin' || scannerStopping;
-    }
+    let scannerStopping = false;
 
     function setStatus(text, type = 'info') {
       statusBox.textContent = text;
       statusBox.className = `status ${type}`;
-    }
-
-    function loadScript(src) {
-      return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = src;
-        script.onload = resolve;
-        script.onerror = () => reject(new Error(`${src} を読み込めませんでした`));
-        document.head.appendChild(script);
-      });
-    }
-
-    async function ensureQrReader() {
-      if (window.jsQR) return;
-
-      const sources = [
-        'jsQR.js',
-        'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js',
-        'https://unpkg.com/jsqr@1.4.0/dist/jsQR.js',
-      ];
-      let lastError = null;
-
-      for (const src of sources) {
-        try {
-          await loadScript(src);
-          if (window.jsQR) return;
-        } catch (error) {
-          lastError = error;
-        }
-      }
-
-      throw lastError || new Error('QR読み取り部品を読み込めませんでした');
-    }
-
-    function disableServiceWorkerCache() {
-      if (!('serviceWorker' in navigator)) return;
-      navigator.serviceWorker.getRegistrations()
-        .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
-        .catch(() => {});
-    }
-
-    function yen(value) {
-      return `${Number(value || 0).toLocaleString('ja-JP')}円`;
-    }
-
-    function makeSerialCode() {
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      const body = Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-      return `DP-${body}`;
     }
 
     function escapeHtml(value) {
@@ -489,6 +416,10 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+    }
+
+    function yen(value) {
+      return `${Number(value || 0).toLocaleString('ja-JP')}円`;
     }
 
     function loadData() {
@@ -503,13 +434,21 @@
       localStorage.setItem(USAGES_KEY, JSON.stringify(usages));
     }
 
+    function disableServiceWorkerCache() {
+      if (!('serviceWorker' in navigator)) return;
+      navigator.serviceWorker.getRegistrations()
+        .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+        .catch(() => {});
+    }
+
     function switchView(viewId) {
       views.forEach((view) => {
         view.hidden = view.id !== viewId;
       });
       tabButtons.forEach((button) => {
-        button.classList.toggle('active', button.dataset.view === viewId);
-        button.classList.toggle('secondary', button.dataset.view !== viewId);
+        const active = button.dataset.view === viewId;
+        button.classList.toggle('active', active);
+        button.classList.toggle('secondary', !active);
       });
     }
 
@@ -528,7 +467,7 @@
         ? products.map((product) => `
           <article class="card">
             <h3>${escapeHtml(product.name)}</h3>
-            <p class="meta">${escapeHtml(product.type)} / ${yen(product.price)}<br>コード: ${escapeHtml(product.code)}</p>
+            <p class="meta">${escapeHtml(product.type)} / ${yen(product.price)}<br>シリアルNO: ${escapeHtml(product.code)}</p>
           </article>
         `).join('')
         : '<p class="meta">まだ商品が登録されていません。</p>';
@@ -539,38 +478,15 @@
         selectedProductBox.innerHTML = '<p class="meta">商品QRを読み取るか、シリアルNOを入力してください。</p>';
         return;
       }
-
       selectedProductBox.innerHTML = `
         <h3>${escapeHtml(selectedProduct.name)}</h3>
-        <p class="meta">${escapeHtml(selectedProduct.type)} / ${yen(selectedProduct.price)}<br>コード: ${escapeHtml(selectedProduct.code)}</p>
+        <p class="meta">${escapeHtml(selectedProduct.type)} / ${yen(selectedProduct.price)}<br>シリアルNO: ${escapeHtml(selectedProduct.code)}</p>
       `;
-    }
-
-    function issueProductQr() {
-      const code = productCodeInput.value.trim();
-      if (!code) {
-        setStatus('先にシリアルNOを発行するか、コードを入力してください。', 'warning');
-        return;
-      }
-
-      productQrText.textContent = `コード: ${code}`;
-      productQrCanvas.hidden = true;
-      productQrImage.hidden = false;
-      productQrImage.onerror = () => {
-        productQrPreview.hidden = true;
-        setStatus('QR画像の読み込みに失敗しました。通信状態を確認してください。', 'error');
-      };
-      productQrImage.onload = () => {
-        setStatus('QR画像を発行しました。表示されたQRを保存・印刷して使えます。', 'success');
-      };
-      productQrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&data=${encodeURIComponent(code)}`;
-      productQrPreview.hidden = false;
-      setStatus('QR画像を発行しています。', 'info');
     }
 
     function renderUsages() {
       usageList.innerHTML = usages.length
-        ? usages.slice(0, 10).map((usage) => `
+        ? usages.slice(0, 20).map((usage) => `
           <article class="card">
             <h3>${escapeHtml(usage.resident)} / ${escapeHtml(usage.productName)} ${usage.quantity}枚</h3>
             <p class="meta">${new Date(usage.createdAt).toLocaleString('ja-JP')} / ${escapeHtml(usage.staff || '職員未入力')} / ${yen(usage.quantity * usage.price)}</p>
@@ -579,11 +495,239 @@
         : '<p class="meta">まだ使用記録がありません。</p>';
     }
 
+    function renderQuantity() {
+      quantityDisplay.textContent = `${selectedQuantity}枚`;
+      decreaseQuantityButton.disabled = selectedQuantity <= 1;
+    }
+
     function renderAll() {
       renderResidents();
       renderProducts();
       renderSelectedProduct();
       renderUsages();
+      renderQuantity();
+    }
+
+    function makeSerialCode() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const body = Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+      return `DP-${body}`;
+    }
+
+    function findProductByCode(rawCode) {
+      const code = rawCode.trim();
+      if (!code) {
+        setStatus('シリアルNOを入力してください。', 'warning');
+        return;
+      }
+      const product = products.find((item) => item.code === code);
+      if (!product) {
+        selectedProduct = null;
+        renderSelectedProduct();
+        setStatus(`登録されていないシリアルNOです: ${code}`, 'warning');
+        return;
+      }
+      selectedProduct = product;
+      renderSelectedProduct();
+      setStatus('商品を選択しました。利用者さんと枚数を選んでください。', 'success');
+    }
+
+    function setScanButtons(activeMode = '') {
+      startWorkScanButton.disabled = activeMode === 'work' || scannerStopping;
+      stopWorkScanButton.disabled = activeMode !== 'work' || scannerStopping;
+      scanProductCodeButton.disabled = activeMode === 'admin' || scannerStopping;
+      stopAdminScanButton.disabled = activeMode !== 'admin' || scannerStopping;
+    }
+
+    function getScanFeedback() {
+      return scanMode === 'admin' ? adminScanFeedback : workScanFeedback;
+    }
+
+    function getDetectedCodeBox() {
+      return scanMode === 'admin' ? adminDetectedCode : workDetectedCode;
+    }
+
+    function showDetectedCode(code) {
+      const box = getDetectedCodeBox();
+      box.textContent = `QR認識しました: ${code}`;
+      box.hidden = false;
+    }
+
+    function ensureQrReader() {
+      if (window.jsQR) return true;
+      setStatus('QR読み取り部品を読み込めませんでした。jsQR.js を一緒にアップロードしてください。', 'error');
+      return false;
+    }
+
+    function ensureQrGenerator() {
+      if (window.QRCode && typeof QRCode.toCanvas === 'function') return true;
+      setStatus('QR発行部品を読み込めませんでした。qrcode.min.js を一緒にアップロードしてください。', 'error');
+      return false;
+    }
+
+    async function openCamera() {
+      const configs = [
+        { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+        { video: { facingMode: 'environment' } },
+        { video: true },
+      ];
+      let lastError = null;
+      for (const constraints of configs) {
+        try {
+          return await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError || new Error('camera start failed');
+    }
+
+    async function startScanner(mode) {
+      if (scannerStopping || !ensureQrReader()) return;
+      if (currentStream) await stopScanner({ silent: true });
+
+      scanMode = mode;
+      lastCode = '';
+      lastCodeAt = 0;
+      scanWaitCount = 0;
+      workScanBox.hidden = mode !== 'work';
+      adminScanBox.hidden = mode !== 'admin';
+      getDetectedCodeBox().hidden = true;
+      getDetectedCodeBox().textContent = '';
+      getScanFeedback().textContent = 'カメラを起動しています...';
+      setScanButtons(mode);
+
+      try {
+        const reader = mode === 'admin' ? adminReader : workReader;
+        reader.innerHTML = '';
+        activeVideo = document.createElement('video');
+        activeVideo.autoplay = true;
+        activeVideo.muted = true;
+        activeVideo.playsInline = true;
+        activeVideo.setAttribute('playsinline', '');
+        reader.appendChild(activeVideo);
+
+        currentStream = await openCamera();
+        activeVideo.srcObject = currentStream;
+        await activeVideo.play();
+
+        getScanFeedback().textContent = 'カメラ起動OK。QR全体を中央に映してください。';
+        setStatus('QR読み取り中です。', 'info');
+        scanFrameId = requestAnimationFrame(scanLoop);
+      } catch (error) {
+        const message = error && error.message ? error.message : String(error);
+        getScanFeedback().textContent = `カメラを起動できませんでした: ${message}`;
+        setStatus('カメラ許可、HTTPS、別アプリのカメラ使用を確認してください。', 'error');
+        await stopScanner({ silent: true });
+      }
+    }
+
+    function ensureScanCanvas() {
+      if (scanCanvas) return;
+      scanCanvas = document.createElement('canvas');
+      scanContext = scanCanvas.getContext('2d', { willReadFrequently: true });
+    }
+
+    function decodeQrFromVideo() {
+      if (!activeVideo || activeVideo.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return '';
+      const width = activeVideo.videoWidth;
+      const height = activeVideo.videoHeight;
+      if (!width || !height) return '';
+
+      ensureScanCanvas();
+      scanCanvas.width = width;
+      scanCanvas.height = height;
+      scanContext.drawImage(activeVideo, 0, 0, width, height);
+      const imageData = scanContext.getImageData(0, 0, width, height);
+      const result = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
+      return result ? result.data : '';
+    }
+
+    function scanLoop() {
+      if (!currentStream) return;
+      const code = decodeQrFromVideo();
+      const now = Date.now();
+
+      if (code && (code !== lastCode || now - lastCodeAt > 1200)) {
+        handleDecodedCode(code);
+      } else if (!code) {
+        scanWaitCount += 1;
+        if (scanWaitCount % 45 === 0) {
+          getScanFeedback().textContent = 'カメラは動いています。QR全体を明るく、中央に映してください。';
+        }
+      }
+
+      scanFrameId = requestAnimationFrame(scanLoop);
+    }
+
+    async function stopScanner(options = {}) {
+      scannerStopping = true;
+      if (scanFrameId) {
+        cancelAnimationFrame(scanFrameId);
+        scanFrameId = 0;
+      }
+      setScanButtons('');
+      if (currentStream) {
+        currentStream.getTracks().forEach((track) => track.stop());
+        currentStream = null;
+      }
+      if (activeVideo) {
+        activeVideo.srcObject = null;
+        activeVideo = null;
+      }
+      workReader.innerHTML = '';
+      adminReader.innerHTML = '';
+      workScanBox.hidden = true;
+      adminScanBox.hidden = true;
+      workScanFeedback.textContent = 'カメラ起動待ち';
+      adminScanFeedback.textContent = 'カメラ起動待ち';
+      scanMode = '';
+      scannerStopping = false;
+      setScanButtons('');
+      if (!options.silent) setStatus('読み取りを停止しました。', 'info');
+    }
+
+    function handleDecodedCode(code) {
+      const now = Date.now();
+      if (!code || (code === lastCode && now - lastCodeAt < 1200)) return;
+
+      lastCode = code;
+      lastCodeAt = now;
+      showDetectedCode(code);
+
+      if (scanMode === 'admin') {
+        productCodeInput.value = code;
+        adminScanFeedback.textContent = `認識しました: ${code}`;
+        stopScanner({ silent: true });
+        setStatus(`シリアルNOを入力しました: ${code}`, 'success');
+        return;
+      }
+
+      manualCodeInput.value = code;
+      workScanFeedback.textContent = `認識しました: ${code}`;
+      findProductByCode(code);
+    }
+
+    async function issueProductQr() {
+      const code = productCodeInput.value.trim();
+      if (!code) {
+        setStatus('先にシリアルNOを発行するか、シリアルNOを入力してください。', 'warning');
+        return;
+      }
+      if (!ensureQrGenerator()) return;
+
+      productQrText.textContent = `シリアルNO: ${code}`;
+      productQrPreview.hidden = false;
+      try {
+        await QRCode.toCanvas(productQrCanvas, code, {
+          width: 180,
+          margin: 2,
+          errorCorrectionLevel: 'M',
+        });
+        setStatus('QRを発行しました。表示されたQRを印刷して使えます。', 'success');
+      } catch (error) {
+        setStatus('QR発行に失敗しました。シリアルNOを確認してください。', 'error');
+      }
     }
 
     function handleResidentSubmit(event) {
@@ -608,11 +752,11 @@
       const price = Number(productPriceInput.value || 0);
 
       if (!name || !code || Number.isNaN(price)) {
-        setStatus('商品名、コード、単価を確認してください。', 'warning');
+        setStatus('商品名、シリアルNO、単価を確認してください。', 'warning');
         return;
       }
       if (products.some((product) => product.code === code)) {
-        setStatus('同じバーコード/QRコードがすでに登録されています。', 'warning');
+        setStatus('同じシリアルNOがすでに登録されています。', 'warning');
         return;
       }
 
@@ -627,29 +771,14 @@
       productForm.reset();
       productPriceInput.value = 0;
       productQrPreview.hidden = true;
-      productQrImage.hidden = true;
-      productQrImage.removeAttribute('src');
       saveData();
       renderProducts();
-      setStatus(`商品を追加しました: ${name} / ${code}`, 'success');
+      setStatus(`商品を追加しました: ${name}`, 'success');
     }
 
-    function findProductByCode(code) {
-      const product = products.find((item) => item.code === code);
-      if (!product) {
-        selectedProduct = null;
-        renderSelectedProduct();
-        setStatus('登録されていない商品コードです。', 'warning');
-        return;
-      }
-      selectedProduct = product;
-      renderSelectedProduct();
-      setStatus('商品を読み取りました。利用者さんと枚数を選んでください。', 'success');
-    }
-
-    function registerUsage(quantity) {
+    function registerUsage() {
       if (!selectedProduct) {
-        setStatus('先に商品QRを読み取るか、シリアルNOを入力してください。', 'warning');
+        setStatus('先に商品QRを読むか、シリアルNOを検索してください。', 'warning');
         return;
       }
       const resident = workResidentSelect.value;
@@ -665,169 +794,17 @@
         productId: selectedProduct.id,
         productName: selectedProduct.name,
         productCode: selectedProduct.code,
-        quantity,
+        quantity: selectedQuantity,
         price: Number(selectedProduct.price || 0),
         staff: staffNameInput.value.trim(),
       });
 
+      const message = `${resident}さんに ${selectedProduct.name} を${selectedQuantity}枚記録しました。`;
+      selectedQuantity = 1;
       saveData();
       renderUsages();
-      setStatus(`${resident}さんに ${selectedProduct.name} を${quantity}枚記録しました。`, 'success');
-    }
-
-    async function startScanner(mode) {
-      if (scannerStopping) return;
-      if (currentStream) {
-        await stopScanner({ silent: true });
-      }
-      scanMode = mode;
-      lastCode = '';
-      lastCodeAt = 0;
-      scanWaitCount = 0;
-      workScanBox.hidden = mode !== 'work';
-      adminScanBox.hidden = mode !== 'admin';
-      getDetectedCodeBox().hidden = true;
-      getDetectedCodeBox().textContent = '';
-      getScanFeedback().textContent = 'カメラを起動しています...';
-      setScanButtons(mode);
-
-      try {
-        await ensureQrReader();
-        const reader = mode === 'admin' ? adminReader : workReader;
-        reader.innerHTML = '';
-        activeVideo = document.createElement('video');
-        activeVideo.autoplay = true;
-        activeVideo.muted = true;
-        activeVideo.playsInline = true;
-        activeVideo.setAttribute('playsinline', '');
-        reader.appendChild(activeVideo);
-
-        currentStream = await openCameraWithFallback();
-        activeVideo.srcObject = currentStream;
-        await activeVideo.play();
-
-        scanning = true;
-        getScanFeedback().textContent = 'カメラ起動OK。QR全体を中央に映してください。';
-        setStatus('QR読み取り中です。', 'info');
-        scanFrameId = requestAnimationFrame(scanLoop);
-      } catch (error) {
-        const message = error && error.message ? error.message : String(error);
-        getScanFeedback().textContent = `カメラを起動できませんでした: ${message}`;
-        setStatus('カメラの起動に失敗しました。ブラウザのカメラ許可とHTTPSのURLを確認してください。', 'error');
-        workScanBox.hidden = true;
-        adminScanBox.hidden = true;
-        setScanButtons('');
-        scanning = false;
-        currentStream = null;
-      }
-    }
-
-    async function openCameraWithFallback() {
-      const cameraConfigs = [
-        { video: { facingMode: { exact: 'environment' } } },
-        { video: { facingMode: { ideal: 'environment' } } },
-        { video: { facingMode: 'user' } },
-        { video: true },
-      ];
-      let lastError = null;
-
-      for (const constraints of cameraConfigs) {
-        try {
-          return await navigator.mediaDevices.getUserMedia(constraints);
-        } catch (error) {
-          lastError = error;
-        }
-      }
-
-      throw lastError || new Error('camera start failed');
-    }
-
-    function ensureScanCanvas() {
-      if (!scanCanvas) {
-        scanCanvas = document.createElement('canvas');
-        scanContext = scanCanvas.getContext('2d');
-      }
-    }
-
-    function decodeQrFromVideo() {
-      if (!activeVideo || activeVideo.readyState !== HTMLMediaElement.HAVE_ENOUGH_DATA) return null;
-      const width = activeVideo.videoWidth;
-      const height = activeVideo.videoHeight;
-      if (!width || !height) return null;
-
-      ensureScanCanvas();
-      scanCanvas.width = width;
-      scanCanvas.height = height;
-      scanContext.drawImage(activeVideo, 0, 0, width, height);
-      const imageData = scanContext.getImageData(0, 0, width, height);
-      const result = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
-      return result ? result.data : null;
-    }
-
-    function scanLoop() {
-      if (!scanning) return;
-      const code = decodeQrFromVideo();
-      const now = Date.now();
-
-      if (code && (code !== lastCode || now - lastCodeAt > 1200)) {
-        handleDecodedCode(code);
-      } else if (!code) {
-        scanWaitCount += 1;
-        if (scanWaitCount % 30 === 0) {
-          getScanFeedback().textContent = 'カメラは動いています。まだQRは読めていません。QR全体を明るく、中央に映してください。';
-        }
-      }
-
-      scanFrameId = requestAnimationFrame(scanLoop);
-    }
-
-    async function stopScanner(options = {}) {
-      scannerStopping = true;
-      scanning = false;
-      if (scanFrameId) {
-        cancelAnimationFrame(scanFrameId);
-        scanFrameId = 0;
-      }
-      setScanButtons('');
-      if (currentStream) {
-        currentStream.getTracks().forEach((track) => track.stop());
-        currentStream = null;
-      }
-      if (activeVideo) {
-        activeVideo.srcObject = null;
-        activeVideo = null;
-      }
-      workReader.innerHTML = '';
-      adminReader.innerHTML = '';
-      workScanBox.hidden = true;
-      adminScanBox.hidden = true;
-      workScanFeedback.textContent = 'カメラ起動待ち';
-      adminScanFeedback.textContent = 'カメラ起動待ち';
-      scannerStopping = false;
-      setScanButtons('');
-      if (!options.silent) {
-        setStatus('読み取りを停止しました。', 'info');
-      }
-    }
-
-    function handleDecodedCode(code) {
-      const now = Date.now();
-      if (!code || (code === lastCode && now - lastCodeAt < 1200)) return;
-
-      lastCode = code;
-      lastCodeAt = now;
-      showDetectedCode(code);
-
-      if (scanMode === 'admin') {
-        adminScanFeedback.textContent = `認識しました: ${code}`;
-        productCodeInput.value = code;
-        stopScanner({ silent: true });
-        setStatus(`商品コードを入力しました: ${code}`, 'success');
-      } else {
-        workScanFeedback.textContent = `認識しました: ${code}`;
-        manualCodeInput.value = code;
-        findProductByCode(code);
-      }
+      renderQuantity();
+      setStatus(message, 'success');
     }
 
     function initEvents() {
@@ -836,27 +813,31 @@
       });
       residentForm.addEventListener('submit', handleResidentSubmit);
       productForm.addEventListener('submit', handleProductSubmit);
+      $('make-serial-code').addEventListener('click', () => {
+        productCodeInput.value = makeSerialCode();
+        productQrPreview.hidden = true;
+        setStatus('シリアルNOを発行しました。必要ならQR発行を押してください。', 'success');
+      });
+      $('make-product-qr').addEventListener('click', issueProductQr);
       scanProductCodeButton.addEventListener('click', () => startScanner('admin'));
-      stopAdminScanButton.addEventListener('click', stopScanner);
+      stopAdminScanButton.addEventListener('click', () => stopScanner());
       startWorkScanButton.addEventListener('click', () => startScanner('work'));
-      stopWorkScanButton.addEventListener('click', stopScanner);
-      manualSearchButton.addEventListener('click', () => findProductByCode(manualCodeInput.value.trim()));
+      stopWorkScanButton.addEventListener('click', () => stopScanner());
+      $('manual-search').addEventListener('click', () => findProductByCode(manualCodeInput.value));
       manualCodeInput.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter') return;
         event.preventDefault();
-        findProductByCode(manualCodeInput.value.trim());
+        findProductByCode(manualCodeInput.value);
       });
-      makeSerialCodeButton.addEventListener('click', () => {
-        productCodeInput.value = makeSerialCode();
-        productQrPreview.hidden = true;
-        productQrImage.hidden = true;
-        productQrImage.removeAttribute('src');
-        setStatus('シリアルNOを発行しました。必要ならQR発行を押してください。', 'success');
+      decreaseQuantityButton.addEventListener('click', () => {
+        selectedQuantity = Math.max(1, selectedQuantity - 1);
+        renderQuantity();
       });
-      makeProductQrButton.addEventListener('click', issueProductQr);
-      document.querySelectorAll('[data-quantity]').forEach((button) => {
-        button.addEventListener('click', () => registerUsage(Number(button.dataset.quantity)));
+      increaseQuantityButton.addEventListener('click', () => {
+        selectedQuantity += 1;
+        renderQuantity();
       });
+      recordQuantityButton.addEventListener('click', registerUsage);
       window.addEventListener('beforeunload', () => {
         if (currentStream) currentStream.getTracks().forEach((track) => track.stop());
       });
