@@ -229,10 +229,10 @@
     <section id="work-view" class="view">
       <div class="panel">
         <h2>作業する</h2>
-        <p class="lead">商品バーコード/QRを読み取ってから、利用者さんと枚数を選びます。</p>
+        <p class="lead">商品QRを読み取るか、シリアルNOを入力してから、利用者さんと枚数を選びます。</p>
 
         <div class="button-row">
-          <button type="button" id="start-work-scan">商品コードを読む</button>
+          <button type="button" id="start-work-scan">商品QRを読む</button>
           <button type="button" id="stop-work-scan" class="secondary" disabled>停止</button>
         </div>
 
@@ -243,12 +243,12 @@
         </div>
 
         <div class="button-row">
-          <input type="text" id="manual-code" placeholder="バーコード番号を手入力" />
+          <input type="text" id="manual-code" placeholder="シリアルNOを入力 例: DP-ABCDEFGH" />
           <button type="button" id="manual-search" class="secondary">検索</button>
         </div>
 
         <div id="selected-product" class="selected-product">
-          <p class="meta">商品コードを読み取ってください。</p>
+          <p class="meta">商品QRを読み取るか、シリアルNOを入力してください。</p>
         </div>
 
         <div class="grid">
@@ -344,7 +344,7 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script>
-    const APP_VERSION = '2026-05-20 QR画像のみ版';
+    const APP_VERSION = '2026-05-20 QR作業読取版';
     const RESIDENTS_KEY = 'diaper-demo-residents-v2';
     const PRODUCTS_KEY = 'diaper-demo-products-v2';
     const USAGES_KEY = 'diaper-demo-usages-v2';
@@ -505,7 +505,7 @@
 
     function renderSelectedProduct() {
       if (!selectedProduct) {
-        selectedProductBox.innerHTML = '<p class="meta">商品コードを読み取ってください。</p>';
+        selectedProductBox.innerHTML = '<p class="meta">商品QRを読み取るか、シリアルNOを入力してください。</p>';
         return;
       }
 
@@ -618,7 +618,7 @@
 
     function registerUsage(quantity) {
       if (!selectedProduct) {
-        setStatus('先に商品バーコード/QRを読み取ってください。', 'warning');
+        setStatus('先に商品QRを読み取るか、シリアルNOを入力してください。', 'warning');
         return;
       }
       const resident = workResidentSelect.value;
@@ -696,7 +696,7 @@
       const onScanFailure = () => {
         scanWaitCount += 1;
         if (scanWaitCount % 12 === 0) {
-          getScanFeedback().textContent = 'カメラは動いています。まだ数字は読めていません。バーコードを明るく、横向きで中央へ。';
+          getScanFeedback().textContent = 'カメラは動いています。まだQRは読めていません。QR全体を明るく、中央に映してください。';
         }
       };
       const cameraConfigs = [
@@ -707,7 +707,7 @@
       ];
       const scannerConfig = {
         fps: 10,
-        qrbox: { width: 260, height: 140 },
+        qrbox: { width: 250, height: 250 },
       };
       let lastError = null;
 
@@ -783,6 +783,11 @@
       startWorkScanButton.addEventListener('click', () => startScanner('work'));
       stopWorkScanButton.addEventListener('click', stopScanner);
       manualSearchButton.addEventListener('click', () => findProductByCode(manualCodeInput.value.trim()));
+      manualCodeInput.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        findProductByCode(manualCodeInput.value.trim());
+      });
       makeSerialCodeButton.addEventListener('click', () => {
         productCodeInput.value = makeSerialCode();
         productQrPreview.hidden = true;
