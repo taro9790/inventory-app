@@ -24,6 +24,17 @@
     .app-shell { max-width: 920px; margin: 0 auto; padding: 18px; }
     header { padding: 18px 0 14px; }
     .lead { color: #526159; margin-top: 8px; }
+    .version {
+      display: inline-flex;
+      margin-top: 10px;
+      padding: 6px 9px;
+      border-radius: 8px;
+      background: #e8f5ee;
+      border: 1px solid #77ad88;
+      color: #174c2b;
+      font-size: 0.84rem;
+      font-weight: 700;
+    }
 
     .tabs {
       display: grid;
@@ -177,6 +188,7 @@
     <header>
       <h1>おむつ使用記録デモ</h1>
       <p class="lead">商品バーコードを読み取り、利用者さんと使用枚数を選んで記録します。</p>
+      <div id="app-version" class="version">読み込み中</div>
     </header>
 
     <nav class="tabs">
@@ -294,12 +306,14 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script>
+    const APP_VERSION = '2026-05-20 カメラ反応表示版';
     const RESIDENTS_KEY = 'diaper-demo-residents-v2';
     const PRODUCTS_KEY = 'diaper-demo-products-v2';
     const USAGES_KEY = 'diaper-demo-usages-v2';
 
     const tabButtons = document.querySelectorAll('.tab-button');
     const views = document.querySelectorAll('.view');
+    const appVersion = document.getElementById('app-version');
     const statusBox = document.getElementById('status');
 
     const residentForm = document.getElementById('resident-form');
@@ -657,7 +671,8 @@
       loadData();
       renderAll();
       initEvents();
-      setStatus('準備完了', 'info');
+      appVersion.textContent = `最新版: ${APP_VERSION}`;
+      setStatus(`準備完了 / ${APP_VERSION}`, 'info');
     }
 
     init();
