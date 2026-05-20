@@ -306,7 +306,7 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script>
-    const APP_VERSION = '2026-05-20 カメラ反応表示版';
+    const APP_VERSION = '2026-05-20 バーコード読取改善版';
     const RESIDENTS_KEY = 'diaper-demo-residents-v2';
     const PRODUCTS_KEY = 'diaper-demo-products-v2';
     const USAGES_KEY = 'diaper-demo-usages-v2';
@@ -355,8 +355,22 @@
     let scanning = false;
     let scanMode = 'work';
     let scanner = null;
+    let scannerStopping = false;
     let lastCode = '';
     let lastCodeAt = 0;
+    let scanWaitCount = 0;
+
+    const SUPPORTED_FORMATS = window.Html5QrcodeSupportedFormats || {};
+    const SCAN_FORMATS = [
+      SUPPORTED_FORMATS.QR_CODE,
+      SUPPORTED_FORMATS.EAN_13,
+      SUPPORTED_FORMATS.EAN_8,
+      SUPPORTED_FORMATS.CODE_128,
+      SUPPORTED_FORMATS.CODE_39,
+      SUPPORTED_FORMATS.UPC_A,
+      SUPPORTED_FORMATS.UPC_E,
+      SUPPORTED_FORMATS.ITF,
+    ].filter(Boolean);
 
     function getScanFeedback() {
       return scanMode === 'admin' ? adminScanFeedback : workScanFeedback;
@@ -370,6 +384,13 @@
       const box = getDetectedCodeBox();
       box.textContent = `読み取り: ${code}`;
       box.hidden = false;
+    }
+
+    function setScanButtons(activeMode = '') {
+      startWorkScanButton.disabled = activeMode === 'work' || scannerStopping;
+      stopWorkScanButton.disabled = activeMode !== 'work' || scannerStopping;
+      scanProductCodeButton.disabled = activeMode === 'admin' || scannerStopping;
+      stopAdminScanButton.disabled = activeMode !== 'admin' || scannerStopping;
     }
 
     function setStatus(text, type = 'info') {
@@ -550,48 +571,54 @@
     }
 
     async function startScanner(mode) {
-      if (scanning) return;
+      if (scannerStopping) return;
+      if (scanner) {
+        await stopScanner({ silent: true });
+      }
       scanMode = mode;
       lastCode = '';
       lastCodeAt = 0;
+      scanWaitCount = 0;
       workScanBox.hidden = mode !== 'work';
       adminScanBox.hidden = mode !== 'admin';
       getDetectedCodeBox().hidden = true;
       getDetectedCodeBox().textContent = '';
       getScanFeedback().textContent = 'カメラを起動しています...';
+      setScanButtons(mode);
 
       if (!window.Html5Qrcode) {
         getScanFeedback().textContent = '読み取りライブラリを読み込めませんでした。';
         setStatus('読み取り機能の読み込みに失敗しました。通信状態を確認してください。', 'error');
+        setScanButtons('');
         return;
       }
 
       try {
         const readerId = mode === 'admin' ? 'admin-reader' : 'work-reader';
-        scanner = new Html5Qrcode(readerId);
+        scanner = new Html5Qrcode(readerId, {
+          formatsToSupport: SCAN_FORMATS,
+          verbose: false,
+        });
         scanning = true;
-        startWorkScanButton.disabled = mode === 'work';
-        stopWorkScanButton.disabled = mode !== 'work';
-        getScanFeedback().textContent = '認識待ちです。バーコード/QRをカメラに映してください。';
+        getScanFeedback().textContent = 'カメラ起動OK。バーコード/QRを中央に映してください。';
         setStatus('読み取り中です。', 'info');
 
-        const formatsToSupport = [
-          Html5QrcodeSupportedFormats.QR_CODE,
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.ITF,
-        ].filter(Boolean);
-
         await scanner.start(
-          { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 260, height: 180 }, formatsToSupport },
+          { facingMode: { ideal: 'environment' } },
+          {
+            fps: 12,
+            aspectRatio: 1.777,
+            qrbox: (viewfinderWidth, viewfinderHeight) => ({
+              width: Math.min(320, Math.floor(viewfinderWidth * 0.9)),
+              height: Math.min(160, Math.floor(viewfinderHeight * 0.5)),
+            }),
+          },
           handleDecodedCode,
           () => {
-            getScanFeedback().textContent = '認識待ちです。バーコード/QRをカメラに映してください。';
+            scanWaitCount += 1;
+            if (scanWaitCount % 12 === 0) {
+              getScanFeedback().textContent = 'カメラは動いています。まだ数字は読めていません。バーコードを明るく、横向きで中央へ。';
+            }
           }
         );
       } catch (error) {
@@ -599,14 +626,16 @@
         setStatus('カメラの起動に失敗しました。ブラウザのカメラ許可とHTTPSのURLを確認してください。', 'error');
         workScanBox.hidden = true;
         adminScanBox.hidden = true;
-        startWorkScanButton.disabled = false;
-        stopWorkScanButton.disabled = true;
+        setScanButtons('');
         scanning = false;
+        scanner = null;
       }
     }
 
-    async function stopScanner() {
+    async function stopScanner(options = {}) {
+      scannerStopping = true;
       scanning = false;
+      setScanButtons('');
       if (scanner) {
         try {
           await scanner.stop();
@@ -620,9 +649,11 @@
       adminScanBox.hidden = true;
       workScanFeedback.textContent = 'カメラ起動待ち';
       adminScanFeedback.textContent = 'カメラ起動待ち';
-      startWorkScanButton.disabled = false;
-      stopWorkScanButton.disabled = true;
-      setStatus('読み取りを停止しました。', 'info');
+      scannerStopping = false;
+      setScanButtons('');
+      if (!options.silent) {
+        setStatus('読み取りを停止しました。', 'info');
+      }
     }
 
     function handleDecodedCode(code) {
@@ -636,7 +667,7 @@
       if (scanMode === 'admin') {
         adminScanFeedback.textContent = `認識しました: ${code}`;
         productCodeInput.value = code;
-        stopScanner();
+        stopScanner({ silent: true });
         setStatus(`商品コードを入力しました: ${code}`, 'success');
       } else {
         workScanFeedback.textContent = `認識しました: ${code}`;
